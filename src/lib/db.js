@@ -11,28 +11,18 @@ const __dirname = path.dirname(__filename);
 let db;
 
 function getDatabase() {
-  if (db) {
-    return db;
+  if (!db) {
+    const dbPath = dev
+      ? path.join(__dirname, "..", "..", "dev.db")
+      : path.join(process.cwd(), DB_PATH);
+
+    db = new Database(dbPath, { verbose: console.log });
+    db.pragma("foreign_keys = ON");
+
+    if (!fs.existsSync(dbPath)) {
+      createTables();
+    }
   }
-
-  const dbPath = dev
-    ? path.join(__dirname, "..", "..", "dev.db")
-    : path.join(process.cwd(), DB_PATH);
-
-  // Check if the database file exists
-  const dbExists = fs.existsSync(dbPath);
-
-  // Initialize the database connection
-  db = new Database(dbPath, { verbose: console.log });
-
-  // Enable foreign key support
-  db.pragma("foreign_keys = ON");
-
-  if (!dbExists) {
-    // If the database didn't exist, create the tables
-    createTables();
-  }
-
   return db;
 }
 

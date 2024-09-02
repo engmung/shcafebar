@@ -2,6 +2,11 @@ import { dev } from "$app/environment";
 
 /** @type {import('@sveltejs/kit').Handle} */
 export async function handle({ event, resolve }) {
+  // CORS 설정
+  if (event.request.method !== "OPTIONS") {
+    event.request.headers.set("Access-Control-Allow-Origin", "*");
+  }
+
   const session = event.cookies.get("session");
   if (session) {
     try {
@@ -14,12 +19,23 @@ export async function handle({ event, resolve }) {
 
   const response = await resolve(event);
 
-  // SameSite 설정 추가 및 개발/프로덕션 환경에 따른 Secure 플래그 설정
+  // CORS 헤더 설정
+  response.headers.set("Access-Control-Allow-Origin", "*");
+  response.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  );
+  response.headers.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+
+  // 쿠키 설정 수정
   const sessionCookie = response.headers.get("Set-Cookie");
   if (sessionCookie) {
     response.headers.set(
       "Set-Cookie",
-      sessionCookie + `; SameSite=Lax; ${dev ? "" : "Secure"}`
+      sessionCookie + `; SameSite=Lax; ${dev ? "Secure; " : ""}HttpOnly`
     );
   }
 

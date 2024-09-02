@@ -114,19 +114,45 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\app.html
 
 File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\hooks.server.js
 
+import { dev } from "$app/environment";
+
 /** @type {import('@sveltejs/kit').Handle} */
 export async function handle({ event, resolve }) {
+  // CORS 설정
+  if (event.request.method !== "OPTIONS") {
+    event.request.headers.set("Access-Control-Allow-Origin", "*");
+  }
+
   const session = event.cookies.get("session");
   if (session) {
-    event.locals.user = JSON.parse(session);
+    try {
+      event.locals.user = JSON.parse(session);
+    } catch (error) {
+      console.error("Failed to parse session:", error);
+      event.cookies.delete("session", { path: "/" });
+    }
   }
 
   const response = await resolve(event);
 
-  // SameSite 설정 추가
+  // CORS 헤더 설정
+  response.headers.set("Access-Control-Allow-Origin", "*");
+  response.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  );
+  response.headers.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+
+  // 쿠키 설정 수정
   const sessionCookie = response.headers.get("Set-Cookie");
   if (sessionCookie) {
-    response.headers.set("Set-Cookie", sessionCookie + "; SameSite=Lax");
+    response.headers.set(
+      "Set-Cookie",
+      sessionCookie + `; SameSite=Lax; ${dev ? "Secure; " : ""}HttpOnly`
+    );
   }
 
   return response;
@@ -139,30 +165,27 @@ import Database from "better-sqlite3";
 import { dev } from "$app/environment";
 import { DB_PATH } from "$env/static/private";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let db;
 
 function getDatabase() {
-  if (db) {
-    return db;
+  if (!db) {
+    const dbPath = dev
+      ? path.join(__dirname, "..", "..", "dev.db")
+      : path.join(process.cwd(), DB_PATH);
+
+    db = new Database(dbPath, { verbose: console.log });
+    db.pragma("foreign_keys = ON");
+
+    if (!fs.existsSync(dbPath)) {
+      createTables();
+    }
   }
-
-  const dbPath = dev ? "./dev.db" : DB_PATH;
-
-  // Check if the database file exists
-  const dbExists = fs.existsSync(dbPath);
-
-  // Initialize the database connection
-  db = new Database(dbPath, { verbose: console.log });
-
-  // Enable foreign key support
-  db.pragma("foreign_keys = ON");
-
-  if (!dbExists) {
-    // If the database didn't exist, create the tables
-    createTables();
-  }
-
   return db;
 }
 
@@ -180,7 +203,8 @@ function createTables() {
       price REAL NOT NULL,
       description TEXT,
       category TEXT NOT NULL,
-      detail_content TEXT
+      detail_content TEXT,
+      is_visible BOOLEAN NOT NULL DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS orders (
@@ -192,16 +216,16 @@ function createTables() {
     );
 
     CREATE TABLE IF NOT EXISTS available_dates (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  date TEXT NOT NULL,
-  time TEXT NOT NULL,
-  capacity INTEGER NOT NULL,
-  menu_id INTEGER,
-  drink_id INTEGER,
-  FOREIGN KEY (menu_id) REFERENCES menu_items(id) ON DELETE SET NULL,
-  FOREIGN KEY (drink_id) REFERENCES menu_items(id) ON DELETE SET NULL,
-  UNIQUE(date, time)
-);
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL,
+      time TEXT NOT NULL,
+      capacity INTEGER NOT NULL,
+      menu_id INTEGER,
+      drink_id INTEGER,
+      FOREIGN KEY (menu_id) REFERENCES menu_items(id) ON DELETE SET NULL,
+      FOREIGN KEY (drink_id) REFERENCES menu_items(id) ON DELETE SET NULL,
+      UNIQUE(date, time)
+    );
 
     CREATE TABLE IF NOT EXISTS ingredients (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -214,16 +238,16 @@ function createTables() {
     );
 
     CREATE TABLE IF NOT EXISTS reservations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_name TEXT NOT NULL,
-  date TEXT NOT NULL,
-  time TEXT NOT NULL,
-  guests INTEGER NOT NULL,
-  menu_request TEXT DEFAULT '',
-  drink_request TEXT DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'pending',
-  FOREIGN KEY (user_name) REFERENCES users(name) ON DELETE CASCADE
-);
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_name TEXT NOT NULL,
+      date TEXT NOT NULL,
+      time TEXT NOT NULL,
+      guests INTEGER NOT NULL,
+      menu_request TEXT DEFAULT '',
+      drink_request TEXT DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      FOREIGN KEY (user_name) REFERENCES users(name) ON DELETE CASCADE
+    );
 
     CREATE TABLE IF NOT EXISTS menu_ingredients (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -718,8 +742,8 @@ export function load() {
   const insertUser = db.prepare(
     "INSERT OR IGNORE INTO users (name, role) VALUES (?, ?)"
   );
-  insertUser.run("John Doe", "user");
-  insertUser.run("Admin User", "admin");
+  insertUser.run("이승훈", "user");
+  insertUser.run("yc2313", "admin");
 
   const users = db.prepare("SELECT * FROM users").all();
   return {
@@ -743,21 +767,21 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\+page.sve
 </svelte:head>
 
 <div class="container">
-  <h1>Welcome to our Bar & Cafe</h1>
-  <p>Enjoy our cozy atmosphere and delicious menu. Make a reservation now!</p>
+  <h1>Welcome to SH's Bar & Cafe</h1>
+  <p>Set up some refreshments. Join me for food and conversation?</p>
 
   <div class="button-container">
     <button class="large-button reservation" on:click={() => navigateTo('/reservations')}>
       <div class="icon-placeholder">
         <img src="/time.png" alt="Time" class="icon-image" />
       </div>
-      <span>Make a Reservation</span>
+      <span>Reservation</span>
     </button>
     <button class="large-button menu" on:click={() => navigateTo('/menu')}>
       <div class="icon-placeholder">
         <img src="/menu.png" alt="Menu" class="icon-image" />
       </div>
-      <span>View Our Menu</span>
+      <span>View Menu</span>
     </button>
   </div>
 </div>
@@ -853,33 +877,129 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\+la
 
 <script>
   import { page } from '$app/stores';
+  import { fly } from 'svelte/transition';
+  let isMenuOpen = false;
+
+  function toggleMenu() {
+    isMenuOpen = !isMenuOpen;
+  }
 </script>
 
-<nav>
-  <a href="/admin" class:active={$page.url.pathname === '/admin'}>Dashboard</a>
-  <a href="/admin/reservations" class:active={$page.url.pathname === '/admin/reservations'}>Reservations</a>
-  <a href="/admin/menu" class:active={$page.url.pathname === '/admin/menu'}>Menu</a>
-  <a href="/admin/database" class:active={$page.url.pathname === '/admin/database'}>Database</a>
-  <a href="/admin/ingredients" class:active={$page.url.pathname === '/admin/ingredients'}>Ingredients</a>
-</nav>
+<div class="admin-layout">
+  <header>
+    <h1>Admin Dashboard</h1>
+    <button class="menu-toggle" on:click={toggleMenu} aria-expanded={isMenuOpen}>
+      {isMenuOpen ? '✕' : '☰'}
+    </button>
+  </header>
 
-<main>
-  <slot />
-</main>
+  <div class="content-wrapper">
+    <nav class:open={isMenuOpen}>
+      <ul>
+        <li><a href="/admin" class:active={$page.url.pathname === '/admin'}>Dashboard</a></li>
+        <li><a href="/admin/reservations" class:active={$page.url.pathname === '/admin/reservations'}>Reservations</a></li>
+        <li><a href="/admin/menu" class:active={$page.url.pathname === '/admin/menu'}>Menu</a></li>
+        <li><a href="/admin/database" class:active={$page.url.pathname === '/admin/database'}>Database</a></li>
+        <li><a href="/admin/ingredients" class:active={$page.url.pathname === '/admin/ingredients'}>Ingredients</a></li>
+      </ul>
+    </nav>
+
+    <main>
+      <slot />
+    </main>
+  </div>
+</div>
 
 <style>
-  nav {
+  .admin-layout {
     display: flex;
-    gap: 1rem;
-    padding: 1rem;
-    background-color: #e0e0e0;
+    flex-direction: column;
+    min-height: 100vh;
   }
-  a {
+
+  header {
+    background-color: #333;
+    color: white;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+  }
+
+  .content-wrapper {
+    display: flex;
+    flex: 1;
+  }
+
+  nav {
+    width: 200px;
+    background-color: #f0f0f0;
+    padding: 1rem;
+  }
+
+  nav ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  nav li {
+    margin-bottom: 0.5rem;
+  }
+
+  nav a {
     text-decoration: none;
     color: #333;
+    padding: 0.5rem;
+    display: block;
+    border-radius: 4px;
   }
-  .active {
-    font-weight: bold;
+
+  nav a.active {
+    background-color: #333;
+    color: white;
+  }
+
+  main {
+    flex: 1;
+    padding: 1rem;
+  }
+
+  @media (max-width: 768px) {
+    .menu-toggle {
+      display: block;
+    }
+
+    .content-wrapper {
+      flex-direction: column;
+    }
+
+    nav {
+      width: 100%;
+      display: none;
+    }
+
+    nav.open {
+      display: block;
+    }
+
+    main {
+      padding: 0.5rem;
+    }
   }
 </style>
 
@@ -922,7 +1042,7 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\+pa
 
 <h1>Admin Dashboard</h1>
 
-<div class="stats">
+<div class="stats-grid">
   <div class="stat-item">
     <h3>Total Reservations</h3>
     <p>{stats.totalReservations}</p>
@@ -943,9 +1063,13 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\+pa
 
 <h2>Low Stock Ingredients</h2>
 {#if lowStockIngredients.length > 0}
-  <ul>
+  <ul class="ingredient-list">
     {#each lowStockIngredients as ingredient}
-      <li>{ingredient.name} - Current: {ingredient.volume} {ingredient.unit}, Minimum: {ingredient.min_volume} {ingredient.unit}</li>
+      <li>
+        <span class="ingredient-name">{ingredient.name}</span>
+        <span class="ingredient-stock">Current: {ingredient.volume} {ingredient.unit}</span>
+        <span class="ingredient-min">Minimum: {ingredient.min_volume} {ingredient.unit}</span>
+      </li>
     {/each}
   </ul>
 {:else}
@@ -953,15 +1077,70 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\+pa
 {/if}
 
 <style>
-  .stats {
+  :global(body) {
+    background-color: #121212;
+    color: #e0e0e0;
+  }
+
+  h1, h2 {
+    color: #bb86fc;
+  }
+
+  .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
   }
+
   .stat-item {
-    border: 1px solid #ccc;
+    background-color: #1e1e1e;
     padding: 1rem;
+    border-radius: 4px;
     text-align: center;
+    border: 1px solid #333;
+  }
+
+  .stat-item h3 {
+    margin-top: 0;
+    color: #03dac6;
+  }
+
+  .ingredient-list {
+    list-style-type: none;
+    padding: 0;
+  }
+
+  .ingredient-list li {
+    background-color: #1e1e1e;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid #333;
+  }
+
+  .ingredient-name {
+    font-weight: bold;
+    color: #03dac6;
+  }
+
+  @media (max-width: 768px) {
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .ingredient-list li {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .ingredient-name, .ingredient-stock, .ingredient-min {
+      width: 100%;
+      margin-bottom: 0.25rem;
+    }
   }
 </style>
 
@@ -1099,35 +1278,103 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\dat
 </div>
 
 <style>
+  :global(body) {
+    background-color: #121212;
+    color: #e0e0e0;
+  }
+
+  h1, h2 {
+    color: #bb86fc;
+  }
+
   .container {
     display: flex;
     gap: 2rem;
   }
+
   .table-list {
     flex: 1;
   }
+
   .table-data {
     flex: 3;
   }
+
   ul {
     list-style-type: none;
     padding: 0;
   }
+
   li {
     margin-bottom: 0.5rem;
   }
+
+  button {
+    background-color: #bb86fc;
+    color: #000;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  button:hover {
+    background-color: #3700b3;
+    color: #fff;
+  }
+
   table {
     width: 100%;
     border-collapse: collapse;
+    background-color: #1e1e1e;
   }
+
   th, td {
-    border: 1px solid #ccc;
+    border: 1px solid #333;
     padding: 0.5rem;
     text-align: left;
   }
+
+  th {
+    background-color: #2c2c2c;
+    color: #03dac6;
+  }
+
   input {
     width: 100%;
     box-sizing: border-box;
+    background-color: #2c2c2c;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    padding: 0.3rem;
+  }
+
+  @media (max-width: 768px) {
+    .container {
+      flex-direction: column;
+    }
+
+    .table-list, .table-data {
+      flex: auto;
+    }
+
+    table, thead, tbody, th, td, tr {
+      display: block;
+    }
+
+    thead tr {
+      position: absolute;
+      top: -9999px;
+      left: -9999px;
+    }
+
+    tr {
+      margin-bottom: 1rem;
+      border: 1px solid #333;
+    }
+
+   
   }
 </style>
 
@@ -1137,7 +1384,7 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\ing
   import { onMount } from 'svelte';
 
   let ingredients = [];
-  let newIngredient = { name: '', cost: 0, characteristics: '', volume: 0, unit: '', min_volume: 0 };
+  let newIngredient = { name: '', cost: null, characteristics: '', volume: null, unit: '', min_volume: null };
 
   onMount(async () => {
     await loadIngredients();
@@ -1161,7 +1408,7 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\ing
 
     if (response.ok) {
       await loadIngredients();
-      newIngredient = { name: '', cost: 0, characteristics: '', volume: 0, unit: '', min_volume: 0 };
+      newIngredient = { name: '', cost: null, characteristics: '', volume: null, unit: '', min_volume: null };
     } else {
       alert('Failed to add ingredient');
     }
@@ -1182,14 +1429,16 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\ing
   }
 
   async function deleteIngredient(id) {
-    const response = await fetch(`/api/admin/ingredients/${id}`, {
-      method: 'DELETE'
-    });
+    if (confirm('Are you sure you want to delete this ingredient?')) {
+      const response = await fetch(`/api/admin/ingredients/${id}`, {
+        method: 'DELETE'
+      });
 
-    if (response.ok) {
-      await loadIngredients();
-    } else {
-      alert('Failed to delete ingredient');
+      if (response.ok) {
+        await loadIngredients();
+      } else {
+        alert('Failed to delete ingredient');
+      }
     }
   }
 </script>
@@ -1197,66 +1446,200 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\ing
 <h1>Manage Ingredients</h1>
 
 <form on:submit|preventDefault={addIngredient}>
-  <input bind:value={newIngredient.name} placeholder="Name" required>
-  <input type="number" bind:value={newIngredient.cost} placeholder="Cost" step="0.01" required>
-  <input bind:value={newIngredient.characteristics} placeholder="Characteristics">
-  <input type="number" bind:value={newIngredient.volume} placeholder="Volume" step="0.01" required>
-  <input bind:value={newIngredient.unit} placeholder="Unit" required>
-  <input type="number" bind:value={newIngredient.min_volume} placeholder="Minimum Volume" step="0.01" required>
+  <div class="form-group">
+    <label for="name">Name</label>
+    <input id="name" bind:value={newIngredient.name} placeholder="Name" required>
+  </div>
+  <div class="form-group">
+    <label for="cost">Cost</label>
+    <input id="cost" type="number" bind:value={newIngredient.cost} placeholder="Cost" step="0.01" required>
+  </div>
+  <div class="form-group">
+    <label for="characteristics">Characteristics</label>
+    <input id="characteristics" bind:value={newIngredient.characteristics} placeholder="Characteristics">
+  </div>
+  <div class="form-group">
+    <label for="volume">Volume</label>
+    <input id="volume" type="number" bind:value={newIngredient.volume} placeholder="Volume" step="0.01" required>
+  </div>
+  <div class="form-group">
+    <label for="unit">Unit</label>
+    <input id="unit" bind:value={newIngredient.unit} placeholder="Unit" required>
+  </div>
+  <div class="form-group">
+    <label for="min_volume">Minimum Volume</label>
+    <input id="min_volume" type="number" bind:value={newIngredient.min_volume} placeholder="Minimum Volume" step="0.01" required>
+  </div>
   <button type="submit">Add Ingredient</button>
 </form>
 
-<table>
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Cost</th>
-      <th>Characteristics</th>
-      <th>Volume</th>
-      <th>Unit</th>
-      <th>Minimum Volume</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {#each ingredients as ingredient (ingredient.id)}
+<h2>Ingredients</h2>
+<div class="table-container">
+  <table>
+    <thead>
       <tr>
-        <td><input bind:value={ingredient.name}></td>
-        <td><input type="number" bind:value={ingredient.cost} step="0.01"></td>
-        <td><input bind:value={ingredient.characteristics}></td>
-        <td><input type="number" bind:value={ingredient.volume} step="0.01"></td>
-        <td><input bind:value={ingredient.unit}></td>
-        <td><input type="number" bind:value={ingredient.min_volume} step="0.01"></td>
-        <td>
-          <button on:click={() => updateIngredient(ingredient)}>Update</button>
-          <button on:click={() => deleteIngredient(ingredient.id)}>Delete</button>
-        </td>
+        <th>Name</th>
+        <th>Cost</th>
+        <th>Characteristics</th>
+        <th>Volume</th>
+        <th>Unit</th>
+        <th>Minimum Volume</th>
+        <th>Actions</th>
       </tr>
-    {/each}
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      {#each ingredients as ingredient (ingredient.id)}
+        <tr>
+          <td data-label="Name"><input bind:value={ingredient.name}></td>
+          <td data-label="Cost"><input type="number" bind:value={ingredient.cost} step="0.01"></td>
+          <td data-label="Characteristics"><input bind:value={ingredient.characteristics}></td>
+          <td data-label="Volume"><input type="number" bind:value={ingredient.volume} step="0.01"></td>
+          <td data-label="Unit"><input bind:value={ingredient.unit}></td>
+          <td data-label="Minimum Volume"><input type="number" bind:value={ingredient.min_volume} step="0.01"></td>
+          <td data-label="Actions">
+            <button on:click={() => updateIngredient(ingredient)}>Update</button>
+            <button on:click={() => deleteIngredient(ingredient.id)}>Delete</button>
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+</div>
 
 <style>
+  :global(body) {
+    background-color: #121212;
+    color: #e0e0e0;
+  }
+
+  h1, h2 {
+    color: #bb86fc;
+  }
+
   form {
     display: flex;
+    flex-direction: column;
     gap: 1rem;
     margin-bottom: 2rem;
+    background-color: #1e1e1e;
+    padding: 1rem;
+    border-radius: 4px;
   }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  label {
+    color: #03dac6;
+  }
+
+  input{
+    background-color: #2c2c2c;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    padding: 0.5rem;
+    border-radius: 4px;
+  }
+
+  button {
+    background-color: #bb86fc;
+    color: #000;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  button:hover {
+    background-color: #3700b3;
+    color: #fff;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
   table {
     width: 100%;
     border-collapse: collapse;
+    margin-bottom: 2rem;
+    background-color: #1e1e1e;
   }
+
   th, td {
-    border: 1px solid #ddd;
+    border: 1px solid #333;
     padding: 0.5rem;
     text-align: left;
   }
-  input {
-    width: 100%;
+
+  th {
+    background-color: #2c2c2c;
+    color: #03dac6;
+  }
+
+  td {
+    color: #ffffff;
+  }
+
+  @media (max-width: 1024px) {
+    table {
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 0.3rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    table, thead, tbody, th, td, tr {
+      display: block;
+    }
+
+    thead tr {
+      position: absolute;
+      top: -9999px;
+      left: -9999px;
+    }
+
+    tr {
+      margin-bottom: 1rem;
+      border: 1px solid #333;
+    }
+
+    td {
+      border: none;
+      position: relative;
+      padding-left: 50%;
+      display: flex;
+      align-items: center;
+    }
+
+    td:before {
+      content: attr(data-label);
+      position: absolute;
+      left: 6px;
+      width: 45%;
+      padding-right: 10px;
+      white-space: nowrap;
+      font-weight: bold;
+      color: #03dac6;
+    }
+
+    td input {
+      width: 100%;
+    }
   }
 </style>
 
 File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\menu\+page.svelte
+
+
+
 
 <script>
   import { onMount } from 'svelte';
@@ -1272,7 +1655,8 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\men
     price: '', 
     category: '', 
     ingredients: [],
-    detail_content: ''
+    detail_content: '',
+    is_visible: true  // 새로운 필드 추가
   });
   let selectedItemStore = writable(null);
   let showPopup = false;
@@ -1302,37 +1686,38 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\men
   }
 
   async function addMenuItem() {
-  try {
-    console.log("Adding new item:", $newItemStore); // 디버깅을 위한 로그 추가
-    const response = await fetch('/api/admin/menu', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify($newItemStore)
-    });
-
-    if (response.ok) {
-      await loadMenuItems();
-      newItemStore.set({ 
-        name: '', 
-        description: '', 
-        price: '', 
-        category: '', 
-        ingredients: [],
-        detail_content: ''
+    try {
+      console.log("Adding new item:", $newItemStore);
+      const response = await fetch('/api/admin/menu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify($newItemStore)
       });
-    } else {
-      const errorData = await response.json();
-      alert('Failed to add menu item: ' + (errorData.error || 'Unknown error'));
+
+      if (response.ok) {
+        await loadMenuItems();
+        newItemStore.set({ 
+          name: '', 
+          description: '', 
+          price: '', 
+          category: '', 
+          ingredients: [],
+          detail_content: '',
+          is_visible: true
+        });
+      } else {
+        const errorData = await response.json();
+        alert('Failed to add menu item: ' + (errorData.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error adding menu item:', error);
+      alert('An error occurred while adding the menu item');
     }
-  } catch (error) {
-    console.error('Error adding menu item:', error);
-    alert('An error occurred while adding the menu item');
   }
-}
 
   async function updateMenuItem(item) {
     try {
-      console.log("Updating item:", item); // 디버깅을 위한 로그
+      console.log("Updating item:", item);
       const response = await fetch(`/api/admin/menu/${item.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -1370,6 +1755,11 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\men
         alert('An error occurred while deleting the menu item');
       }
     }
+  }
+
+  async function toggleVisibility(item) {
+    const updatedItem = { ...item, is_visible: !item.is_visible };
+    await updateMenuItem(updatedItem);
   }
 
   function addIngredientToItem(itemStore) {
@@ -1442,6 +1832,11 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\men
   <h3>Detail Content (Markdown)</h3>
   <MarkdownEditor bind:value={$newItemStore.detail_content} />
 
+  <label>
+    <input type="checkbox" bind:checked={$newItemStore.is_visible}>
+    Visible to users
+  </label>
+
   <button type="submit">Add Item</button>
 </form>
 
@@ -1452,6 +1847,7 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\men
       <th>Description</th>
       <th>Price</th>
       <th>Category</th>
+      <th>Visibility</th>
       <th>Actions</th>
     </tr>
   </thead>
@@ -1462,6 +1858,11 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\men
         <td>{item.description}</td>
         <td>{item.price}</td>
         <td>{item.category}</td>
+        <td>
+          <button on:click={() => toggleVisibility(item)}>
+            {item.is_visible ? 'Hide' : 'Show'}
+          </button>
+        </td>
         <td>
           <button on:click={() => showDetails(item)}>View Details</button>
           <button on:click={() => deleteMenuItem(item.id)}>Delete</button>
@@ -1506,12 +1907,18 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\men
           on:input={updateDetailContent}
         />
         
+        <label>
+          <input type="checkbox" bind:checked={$selectedItemStore.is_visible}>
+          Visible to users
+        </label>
+
         <button on:click={() => updateMenuItem($selectedItemStore)}>Save Changes</button>
       {:else}
         <h2>{$selectedItemStore.name}</h2>
         <p>Price: ${$selectedItemStore.price}</p>
         <p>Category: {$selectedItemStore.category}</p>
         <p>Description: {$selectedItemStore.description}</p>
+        <p>Visibility: {$selectedItemStore.is_visible ? 'Visible' : 'Hidden'}</p>
         <h3>Ingredients</h3>
         <ul>
           {#each $selectedItemStore.ingredients || [] as ingredient}
@@ -1552,47 +1959,58 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\men
     overflow-y: auto;
   }
   .markdown-preview {
-    border: 1px solid #ccc;
+    border: 1px solid #333;
     padding: 1rem;
     border-radius: 4px;
     max-height: 400px;
     overflow-y: auto;
-    background-color: #f9f9f9;
+    background-color: #2c2c2c;
   }
+
   .markdown-preview :global(h1),
   .markdown-preview :global(h2),
   .markdown-preview :global(h3),
   .markdown-preview :global(h4),
   .markdown-preview :global(h5),
   .markdown-preview :global(h6) {
+    color: #bb86fc;
     margin-top: 1em;
     margin-bottom: 0.5em;
   }
+
   .markdown-preview :global(p) {
     margin-bottom: 1em;
   }
+
   .markdown-preview :global(ul),
   .markdown-preview :global(ol) {
     padding-left: 2em;
     margin-bottom: 1em;
   }
+
   .markdown-preview :global(code) {
-    background-color: #eee;
+    background-color: #3c3c3c;
+    color: #e0e0e0;
     padding: 0.2em 0.4em;
     border-radius: 3px;
   }
+
   .markdown-preview :global(pre) {
-    background-color: #eee;
+    background-color: #3c3c3c;
+    color: #e0e0e0;
     padding: 1em;
     border-radius: 3px;
     overflow-x: auto;
   }
+
   .markdown-preview :global(blockquote) {
-    border-left: 4px solid #ccc;
+    border-left: 4px solid #bb86fc;
     padding-left: 1em;
     margin-left: 0;
-    color: #666;
+    color: #a0a0a0;
   }
+
+  
 </style>
 
 File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\reservations\+page.svelte
@@ -2359,8 +2777,15 @@ export async function POST({ request, locals }) {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { name, description, price, category, ingredients, detail_content } =
-    await request.json();
+  const {
+    name,
+    description,
+    price,
+    category,
+    ingredients,
+    detail_content,
+    is_visible,
+  } = await request.json();
 
   console.log("Received new item data:", {
     name,
@@ -2369,16 +2794,24 @@ export async function POST({ request, locals }) {
     category,
     ingredients,
     detail_content,
-  }); // 디버깅을 위한 로그
+    is_visible,
+  });
 
   db.prepare("BEGIN TRANSACTION").run();
 
   try {
     const result = db
       .prepare(
-        "INSERT INTO menu_items (name, description, price, category, detail_content) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO menu_items (name, description, price, category, detail_content, is_visible) VALUES (?, ?, ?, ?, ?, ?)"
       )
-      .run(name, description, price, category, detail_content);
+      .run(
+        name,
+        description,
+        price,
+        category,
+        detail_content,
+        is_visible ? 1 : 0
+      ); // 여기를 수정
 
     const menuId = result.lastInsertRowid;
 
@@ -2401,7 +2834,7 @@ export async function POST({ request, locals }) {
 
     db.prepare("COMMIT").run();
 
-    console.log("New item added successfully:", menuId); // 디버깅을 위한 로그
+    console.log("New item added successfully:", menuId);
 
     return json({ success: true, id: menuId });
   } catch (error) {
@@ -2422,9 +2855,13 @@ export function GET({ locals }) {
   try {
     const menuItems = db
       .prepare(
-        "SELECT id, name, description, price, category, detail_content FROM menu_items"
+        "SELECT id, name, description, price, category, detail_content, is_visible FROM menu_items"
       )
-      .all();
+      .all()
+      .map((item) => ({
+        ...item,
+        is_visible: Boolean(item.is_visible), // 정수를 boolean으로 변환
+      }));
 
     for (const item of menuItems) {
       item.ingredients = db
@@ -2439,7 +2876,7 @@ export function GET({ locals }) {
         .all(item.id);
     }
 
-    console.log("Menu items:", menuItems); // 디버깅용 로그
+    console.log("Menu items:", menuItems);
 
     return json(menuItems);
   } catch (error) {
@@ -2463,15 +2900,30 @@ export async function PUT({ params, request, locals }) {
   }
 
   const { id } = params;
-  const { name, description, price, category, ingredients, detail_content } =
-    await request.json();
+  const {
+    name,
+    description,
+    price,
+    category,
+    ingredients,
+    detail_content,
+    is_visible,
+  } = await request.json();
 
   db.prepare("BEGIN TRANSACTION").run();
 
   try {
     db.prepare(
-      "UPDATE menu_items SET name = ?, description = ?, price = ?, category = ?, detail_content = ? WHERE id = ?"
-    ).run(name, description, price, category, detail_content, id);
+      "UPDATE menu_items SET name = ?, description = ?, price = ?, category = ?, detail_content = ?, is_visible = ? WHERE id = ?"
+    ).run(
+      name,
+      description,
+      price,
+      category,
+      detail_content,
+      is_visible ? 1 : 0,
+      id
+    );
 
     db.prepare("DELETE FROM menu_ingredients WHERE menu_id = ?").run(id);
 
@@ -2792,6 +3244,7 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\api\login
 
 import { db } from "$lib/db";
 import { json } from "@sveltejs/kit";
+import { dev } from "$app/environment";
 
 export async function POST({ request, cookies }) {
   const { name } = await request.json();
@@ -2799,30 +3252,45 @@ export async function POST({ request, cookies }) {
   let user = db.prepare("SELECT * FROM users WHERE name = ?").get(name);
 
   if (!user) {
-    const result = db
-      .prepare("INSERT INTO users (name, role) VALUES (?, ?)")
-      .run(name, "user");
-    user = { id: result.lastInsertRowid, name, role: "user" };
+    try {
+      const result = db
+        .prepare("INSERT INTO users (name, role) VALUES (?, ?)")
+        .run(name, "user");
+      user = { id: result.lastInsertRowid, name, role: "user" };
+    } catch (error) {
+      if (error.code === "SQLITE_CONSTRAINT") {
+        user = db.prepare("SELECT * FROM users WHERE name = ?").get(name);
+      } else {
+        console.error("Error creating user:", error);
+        return json({ error: "Failed to create user" }, { status: 500 });
+      }
+    }
   }
 
   cookies.set("session", JSON.stringify(user), {
     path: "/",
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7, // 1주일
+    secure: !dev, // 개발 환경에서는 false, 프로덕션에서는 true
+    maxAge: 60 * 60 * 24 * 7, // 1 week
   });
 
-  return json({ success: true });
+  return json({ success: true, user });
 }
 
 
 File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\api\logout\+server.js
 
 import { json } from "@sveltejs/kit";
+import { dev } from "$app/environment";
 
 export function POST({ cookies }) {
-  cookies.delete("session", { path: "/", httpOnly: true, sameSite: "lax" });
+  cookies.delete("session", {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: !dev,
+  });
   return json({ success: true });
 }
 
@@ -2837,7 +3305,9 @@ import { json } from "@sveltejs/kit";
 
 export function GET() {
   const menuItems = db
-    .prepare("SELECT * FROM menu_items ORDER BY category, name")
+    .prepare(
+      "SELECT * FROM menu_items WHERE is_visible = 1 ORDER BY category, name"
+    )
     .all();
   return json(menuItems);
 }
@@ -3131,8 +3601,7 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\menu\+pag
   <p>No menu items available.</p>
 {/if}
 
-<MenuDetailPopup item={selectedItem} onClose={closePopup} />
-<style>
+<MenuDetailPopup item={selectedItem} onClose={closePopup} /><style>
   .menu-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));

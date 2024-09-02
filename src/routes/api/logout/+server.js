@@ -6,7 +6,7 @@ export function POST({ cookies }) {
     path: "/",
     httpOnly: true,
     sameSite: "lax",
-    secure: !dev,
+    secure: false,
   });
   return json({ success: true });
 }
