@@ -68,43 +68,43 @@
   }
 
   async function makeReservation() {
-  if (!selectedDate) {
-    alert('Please select a date and time');
-    return;
-  }
+    if (!selectedDate) {
+      alert('Please select a date and time');
+      return;
+    }
 
-  if (guests > selectedDate.capacity) {
-    alert('Not enough capacity for this reservation');
-    return;
-  }
+    if (guests > selectedDate.capacity) {
+      alert('Not enough capacity for this reservation');
+      return;
+    }
 
-  const response = await fetch('/api/reservations', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      date: selectedDate.date,
-      time: selectedDate.time,
-      guests,
-      menuRequest,
-      drinkRequest
-    })
-  });
+    const response = await fetch('/api/reservations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: selectedDate.date,
+        time: selectedDate.time,
+        guests,
+        menuRequest,
+        drinkRequest
+      })
+    });
 
-  if (response.ok) {
-    alert('Reservation made successfully!');
-    selectedDate = null;
-    guests = 1;
-    menuRequest = '';
-    drinkRequest = '';
-    showPopup = false;
-    await loadAvailableDates();
-    await loadUserReservations();
-    initializeCalendar();
-  } else {
-    const errorData = await response.json();
-    alert('Failed to make reservation: ' + (errorData.error || 'Unknown error'));
+    if (response.ok) {
+      alert('Reservation made successfully!');
+      selectedDate = null;
+      guests = 1;
+      menuRequest = '';
+      drinkRequest = '';
+      showPopup = false;
+      await loadAvailableDates();
+      await loadUserReservations();
+      initializeCalendar();
+    } else {
+      const errorData = await response.json();
+      alert('Failed to make reservation: ' + (errorData.error || 'Unknown error'));
+    }
   }
-}
 
   async function cancelReservation(id) {
     if (confirm('Are you sure you want to cancel this reservation?')) {
@@ -211,6 +211,7 @@
   }
   form {
     display: flex;
+    flex-direction: column;
     gap: 1rem;
     margin-bottom: 2rem;
   }
@@ -220,32 +221,66 @@
     margin-bottom: 2rem;
   }
   th, td {
-    border: 1px solid #ddd;
+    border: 1px solid #444;
     padding: 0.5rem;
     text-align: left;
   }
-  .edit-form {
-    margin-top: 1rem;
-    padding: 1rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+  .popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
   }
-  .edit-form label {
-    display: block;
+  .popup-content {
+    background-color: #222;
+    color: #e0e0e0;
+    padding: 2rem;
+    border-radius: 5px;
+    max-width: 500px;
+    width: 100%;
+  }
+  .popup-content h2 {
+    color: #bb86fc;
+    margin-bottom: 1rem;
+  }
+  .popup-content p {
     margin-bottom: 0.5rem;
   }
-  .edit-form input, .edit-form select {
-    width: 100%;
-    padding: 0.3rem;
+  .popup-content button {
+    background-color: #bb86fc;
+    color: #000;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
   }
-
+  .popup-content button:hover {
+    background-color: #9d61f9;
+  }
+  .popup-content input,
+  .popup-content textarea {
+    background-color: #333;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    padding: 0.5rem;
+    border-radius: 4px;
+    width: 100%;
+  }
+  .popup-content label {
+    display: block;
+    margin-bottom: 0.3rem;
+    color: #bb86fc;
+  }
   @media (max-width: 768px) {
     .calendar-container {
       height: 400px;
-    }
-    
-    form {
-      flex-direction: column;
     }
     
     table, thead, tbody, th, td, tr {
@@ -260,7 +295,7 @@
     
     tr {
       margin-bottom: 1rem;
-      border: 1px solid #ddd;
+      border: 1px solid #444;
     }
     
     td {
@@ -277,6 +312,7 @@
       padding-right: 10px;
       white-space: nowrap;
       font-weight: bold;
+      color: #bb86fc;
     }
   }
 </style>

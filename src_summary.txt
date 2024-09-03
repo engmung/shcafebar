@@ -3271,7 +3271,7 @@ export async function POST({ request, cookies }) {
     path: "/",
     httpOnly: true,
     sameSite: "lax",
-    secure: !dev, // 개발 환경에서는 false, 프로덕션에서는 true
+    secure: false,
     maxAge: 60 * 60 * 24 * 7, // 1 week
   });
 
@@ -3289,7 +3289,7 @@ export function POST({ cookies }) {
     path: "/",
     httpOnly: true,
     sameSite: "lax",
-    secure: !dev,
+    secure: false,
   });
   return json({ success: true });
 }
