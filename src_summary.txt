@@ -14,23 +14,82 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\app.css
   --font-body: "Poppins", sans-serif;
   --font-heading: "Playfair Display", serif;
   --font-mono: "Fira Mono", monospace;
-  --color-bg: #121212;
-  --color-text: #eeeeee;
+  --color-bg-overlay: rgba(18, 18, 18, 0.8);
+  --color-text: #ffffff;
   --color-primary: #bb86fc;
   --color-secondary: #b10044;
   --color-accent: #cf6679;
-  --color-surface: #1e1e1e;
+  --color-surface: rgba(30, 30, 30, 0.9);
   --color-error: #cf6679;
   --z-index-menu: 1000;
 }
 
+html,
 body {
-  min-height: 100vh;
+  height: 100%;
   margin: 0;
-  background-color: var(--color-bg);
+  padding: 0;
+  overflow-x: hidden;
+}
+
+body {
   color: var(--color-text);
   font-family: var(--font-body);
   line-height: 1.6;
+  background-color: #000;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  height: 100vh;
+  background-image: url("/bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: -2;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 150%;
+  background-color: var(--color-bg-overlay);
+  z-index: -1;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+header,
+.header-nav,
+footer {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  box-sizing: border-box;
 }
 
 h1,
@@ -42,6 +101,7 @@ h6 {
   font-family: var(--font-heading);
   font-weight: 700;
   color: var(--color-primary);
+  margin-top: 0;
 }
 
 a {
@@ -58,7 +118,7 @@ button {
   font-family: var(--font-body);
   cursor: pointer;
   background-color: var(--color-primary);
-  color: var(--color-bg);
+  color: var(--color-bg-overlay);
   border: none;
   padding: 10px 20px;
   border-radius: 5px;
@@ -95,6 +155,47 @@ button:hover {
   }
 }
 
+/* Smooth scrolling for the whole page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Improve text rendering */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Basic form styles */
+input,
+textarea,
+select {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-secondary);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Focus styles for accessibility */
+a:focus,
+button:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Utility classes */
+.text-center {
+  text-align: center;
+}
+
 
 File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\app.html
 
@@ -104,6 +205,7 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\app.html
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
     <meta name="viewport" content="width=device-width" />
+    <link rel="preload" as="image" href="/bg.jpg" />
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
@@ -264,6 +366,81 @@ function createTables() {
 const dbInstance = getDatabase();
 export { dbInstance as db };
 
+
+File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\lib\Loading.svelte
+
+<script>
+    import { onMount } from 'svelte';
+    import { fade } from 'svelte/transition';
+  
+    export let isLoading;
+  
+    let imageLoaded = false;
+    let timerExpired = false;
+  
+    function checkLoading() {
+      if (imageLoaded && timerExpired) {
+        isLoading = false;
+      }
+    }
+  
+    onMount(() => {
+      const img = new Image();
+      img.src = '/bg.jpg';
+      img.onload = () => {
+        imageLoaded = true;
+        checkLoading();
+      };
+  
+      setTimeout(() => {
+        timerExpired = true;
+        checkLoading();
+      }, 1000);
+    });
+  </script>
+  
+  {#if isLoading}
+    <div class="loading-overlay" transition:fade={{ duration: 300 }}>
+      <div class="loading-spinner"></div>
+      <p>Loading...</p>
+    </div>
+  {/if}
+  
+  <style>
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #000000; /* 완전 불투명한 검정색으로 변경 */
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+  
+    .loading-spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+  
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  
+    p {
+      color: #fff;
+      margin-top: 1rem;
+      font-size: 1.2rem;
+    }
+  </style>
 
 File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\lib\MarkdownEditor.svelte
 
@@ -527,10 +704,12 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\+layout.s
   import { fly } from 'svelte/transition';
   import { invalidateAll } from '$app/navigation';
   import '../app.css';
+  import Loading from '$lib/Loading.svelte';
 
   export let data;
 
   let isMenuOpen = false;
+  let isLoading = true;
 
   async function handleLogout() {
     const response = await fetch('/api/logout', { method: 'POST' });
@@ -553,57 +732,69 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\+layout.s
     goto('/');
     closeMenu();
   }
+
+  function goToLogin() {
+    goto('/login');
+    closeMenu();
+  }
 </script>
 
-<div class="app">
-  <header>
-    <div
-      class="logo"
-      on:click={goHome}
-      on:keydown={(e) => e.key === 'Enter' && goHome()}
-      role="button"
-      tabindex="0"
-    >
-      SH's BAR & CAFE
+<Loading bind:isLoading />
+
+{#if !isLoading}
+  <div class="app">
+    <header>
+      <div class="header-title">
+        <h1 class="logo" on:click={goHome} on:keydown={(e) => e.key === 'Enter' && goHome()} role="button" tabindex="0">
+          SH's BAR & CAFE
+        </h1>
+      </div>
+    </header>
+    
+    <div class="header-nav">
+      <div class="header-content">
+        <div class="header-left">
+          <button class="menu-button" on:click={toggleMenu}>
+            {#if isMenuOpen}
+              Close
+            {:else}
+              ☰ Menu
+            {/if}
+          </button>
+        </div>
+        <div class="header-right">
+          {#if data.user}
+            <span class="user-name">{data.user.name}</span>
+            <button class="logout-button" on:click={handleLogout}>Logout</button>
+          {:else}
+            <button class="login-button" on:click={goToLogin}>Login</button>
+          {/if}
+        </div>
+      </div>
     </div>
-    <button class="menu-button" on:click={toggleMenu}>
-      {#if isMenuOpen}
-        Close
-      {:else}
-        Menu ☰
-      {/if}
-    </button>
-  </header>
 
-  <main>
-    <slot />
-  </main>
+    <main>
+      <slot />
+    </main>
 
-  <footer>
-    <p>&copy; 2024 SH's Bar & Cafe. All rights reserved.</p>
-  </footer>
+    <footer>
+      <p>&copy; 2024 SH's Bar & Cafe. All rights reserved.</p>
+    </footer>
 
-  {#if isMenuOpen}
-    <nav transition:fly={{ y: -200, duration: 300 }}>
-      <ul>
-        <li><a href="/" on:click={closeMenu}>Home</a></li>
-        <li><a href="/menu" on:click={closeMenu}>Menu</a></li>
-        <li><a href="/reservations" on:click={closeMenu}>Reservations</a></li>
-        {#if data.user}
-          <li>
-            <span class="user-info">Welcome, {data.user.name}!</span>
-            <button on:click={handleLogout}>Logout</button>
-          </li>
-        {:else}
-          <li><a href="/login" on:click={closeMenu}>Login</a></li>
-        {/if}
-        {#if data.user?.role === 'admin'}
-          <li><a href="/admin" on:click={closeMenu}>Admin</a></li>
-        {/if}
-      </ul>
-    </nav>
-  {/if}
-</div>
+    {#if isMenuOpen}
+      <nav transition:fly={{ y: -200, duration: 300 }}>
+        <ul>
+          <li><a href="/" on:click={closeMenu}>Home</a></li>
+          <li><a href="/menu" on:click={closeMenu}>Menu</a></li>
+          <li><a href="/reservations" on:click={closeMenu}>Reservations</a></li>
+          {#if data.user?.role === 'admin'}
+            <li><a href="/admin" on:click={closeMenu}>Admin</a></li>
+          {/if}
+        </ul>
+      </nav>
+    {/if}
+  </div>
+{/if}
 
 <style>
   .app {
@@ -613,33 +804,72 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\+layout.s
   }
 
   header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    background-color: #000;
+    background-color: rgba(0, 0, 0, 0.7);
     color: #fff;
-    position: relative;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  .header-nav {
+    background-color: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    position: sticky;
+    top: 0;
     z-index: calc(var(--z-index-menu) + 1);
   }
 
+  .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.1rem .2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .header-left, .header-right {
+    display: flex;
+    align-items: center;
+  }
+
   .logo {
-    font-size: 1.5rem;
+    font-size: 2rem;
     font-weight: bold;
     cursor: pointer;
     user-select: none;
+    margin: 0;
+  }
+
+  .menu-button, .login-button, .logout-button {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    transition: opacity 0.3s ease;
   }
 
   .menu-button {
-    background: none;
-    border: none;
+    color: #fff;
+  }
+
+  .login-button, .logout-button {
+    font-weight: 1000;
+    color: #ff0000;
+    
+    
+
+  }
+
+  .login-button:hover, .logout-button:hover {
+    opacity: 0.8;
+    
+  }
+
+  .user-name {
     color: #fff;
     font-size: 1rem;
-    cursor: pointer;
-    position: fixed;
-    top: 1rem;
-    right: 1rem;
-    z-index: calc(var(--z-index-menu) + 2);
+    margin-right: 1rem;
   }
 
   main {
@@ -648,7 +878,7 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\+layout.s
   }
 
   footer {
-    background-color: #000;
+    background-color: rgba(0, 0, 0, 0.7);
     color: #fff;
     text-align: center;
     padding: 1rem;
@@ -677,33 +907,30 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\+layout.s
     margin: 1rem 0;
   }
 
-  nav a, nav button {
+  nav a {
     color: var(--color-secondary);
     text-decoration: none;
     font-size: 2rem;
     transition: color 0.3s ease;
   }
 
-  nav a:hover, nav button:hover {
+  nav a:hover {
     color: var(--color-accent);
-  }
-
-  nav button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 2rem;
-    padding: 0;
-  }
-
-  .user-info {
-    color: #fff;
-    font-size: 1.5rem;
   }
 
   @media (max-width: 768px) {
     .logo {
-      font-size: 1.2rem;
+      font-size: 1.5rem;
+    }
+
+    .user-name {
+      font-size: 0.9rem;
+      margin-right: 0.5rem;
+    }
+
+    .login-button, .logout-button {
+      padding: 0.4rem 0.8rem;
+      font-size: 0.9rem;
     }
 
     nav {
@@ -719,17 +946,13 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\+layout.s
       text-align: center;
     }
 
-    nav a, nav button {
+    nav a {
       font-size: 1.2rem;
       display: block;
       width: 100%;
       text-align: center;
       padding: 0.5rem 0;
       font-weight: 1000;
-    }
-
-    .user-info {
-      font-size: 1.2rem;
     }
   }
 </style>
@@ -3762,6 +3985,7 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\reservati
   import dayGridPlugin from '@fullcalendar/daygrid';
   import interactionPlugin from '@fullcalendar/interaction';
   import MenuDetailPopup from '$lib/MenuDetailPopup.svelte';
+  import { goto } from '$app/navigation';
 
   let availableDates = [];
   let selectedDate = null;
@@ -3804,10 +4028,20 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\reservati
         initialView: 'dayGridMonth',
         dateClick: handleDateClick,
         events: availableDates.map(date => ({
-          title: `${date.time} (${date.reserved_capacity}/${date.capacity + date.reserved_capacity})`,
-          date: date.date,
-          extendedProps: { ...date }
-        }))
+          title: `${date.time} (${date.reserved_capacity || 0}/${date.capacity + date.reserved_capacity})`,
+          date: date.date
+        })),
+        headerToolbar: {
+          left: 'prev',
+          center: 'title',
+          right: 'next'
+        },
+        titleFormat: { month: 'numeric' },
+        dayHeaderFormat: { weekday: 'short' },
+        buttonText: {
+          prev: '<',
+          next: '>'
+        }
       });
       calendar.render();
     }
@@ -3826,43 +4060,49 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\reservati
   }
 
   async function makeReservation() {
-  if (!selectedDate) {
-    alert('Please select a date and time');
-    return;
-  }
+    if (!selectedDate) {
+      alert('Please select a date and time');
+      return;
+    }
 
-  if (guests > selectedDate.capacity) {
-    alert('Not enough capacity for this reservation');
-    return;
-  }
+    if (guests > selectedDate.capacity) {
+      alert('Not enough capacity for this reservation');
+      return;
+    }
 
-  const response = await fetch('/api/reservations', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      date: selectedDate.date,
-      time: selectedDate.time,
-      guests,
-      menuRequest,
-      drinkRequest
-    })
-  });
+    const response = await fetch('/api/reservations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: selectedDate.date,
+        time: selectedDate.time,
+        guests,
+        menuRequest,
+        drinkRequest
+      })
+    });
 
-  if (response.ok) {
-    alert('Reservation made successfully!');
-    selectedDate = null;
-    guests = 1;
-    menuRequest = '';
-    drinkRequest = '';
-    showPopup = false;
-    await loadAvailableDates();
-    await loadUserReservations();
-    initializeCalendar();
-  } else {
-    const errorData = await response.json();
-    alert('Failed to make reservation: ' + (errorData.error || 'Unknown error'));
+    if (response.ok) {
+      alert('Reservation made successfully!');
+      selectedDate = null;
+      guests = 1;
+      menuRequest = '';
+      drinkRequest = '';
+      showPopup = false;
+      await loadAvailableDates();
+      await loadUserReservations();
+      initializeCalendar();
+    } else {
+      const errorData = await response.json();
+      if (errorData.error === "Unauthorized") {
+        if (confirm("You need to be logged in to make a reservation. Would you like to log in now?")) {
+          goto('/login');
+        }
+      } else {
+        alert('Failed to make reservation: ' + (errorData.error || 'Unknown error'));
+      }
+    }
   }
-}
 
   async function cancelReservation(id) {
     if (confirm('Are you sure you want to cancel this reservation?')) {
@@ -3931,31 +4171,31 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\reservati
 <h2>Your Reservations</h2>
 {#if userReservations.length > 0}
   <table>
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Time</th>
-      <th>Guests</th>
-      <th>Menu</th>
-      <th>Drink</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {#each userReservations as reservation}
+    <thead>
       <tr>
-        <td data-label="Date">{reservation.date}</td>
-        <td data-label="Time">{reservation.time}</td>
-        <td data-label="Guests">{reservation.guests}</td>
-        <td data-label="Menu">{reservation.menu_name}</td>
-        <td data-label="Drink">{reservation.drink_name}</td>
-        <td data-label="Actions">
-          <button on:click={() => cancelReservation(reservation.id)}>Cancel</button>
-        </td>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Guests</th>
+        <th>Menu</th>
+        <th>Drink</th>
+        <th>Actions</th>
       </tr>
-    {/each}
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      {#each userReservations as reservation}
+        <tr>
+          <td data-label="Date">{reservation.date}</td>
+          <td data-label="Time">{reservation.time}</td>
+          <td data-label="Guests">{reservation.guests}</td>
+          <td data-label="Menu">{reservation.menu_name}</td>
+          <td data-label="Drink">{reservation.drink_name}</td>
+          <td data-label="Actions">
+            <button on:click={() => cancelReservation(reservation.id)}>Cancel</button>
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
 {:else}
   <p>You have no reservations.</p>
 {/if}
@@ -3964,77 +4204,149 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\reservati
 
 <style>
   .calendar-container {
-    height: 600px;
+    height: 400px;
     margin-bottom: 2rem;
+    background-color: #000;
+    width: 100%;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
   }
+
+  /* FullCalendar 스타일 오버라이드 */
+  :global(.fc) {
+    background-color: #000;
+    color: #fff;
+  }
+
+  :global(.fc-toolbar-title) {
+    color: #bb86fc !important;
+    font-size: 2rem !important;
+  }
+
+  :global(.fc-col-header-cell-cushion) {
+    color: #fff;
+  }
+
+  :global(.fc-daygrid-day-number) {
+    color: #fff;
+  }
+
+  :global(.fc-day-today) {
+    background-color: transparent !important;
+  }
+
+  :global(.fc-event) {
+    background-color: var(--color-secondary);
+    border-color: var(--color-secondary);
+  }
+
+  :global(.fc-button-primary) {
+    background-color: transparent !important;
+    border-color: transparent !important;
+    color: #ff0000 !important;
+    font-size: 1.5rem !important;
+    padding: 0.3em 0.5em !important;
+    box-shadow: none !important;
+  }
+
+  :global(.fc-button-primary:hover),
+  :global(.fc-button-primary:focus),
+  :global(.fc-button-primary:not(:disabled):active),
+  :global(.fc-button-primary:not(:disabled).fc-button-active) {
+    background-color: transparent !important;
+    border-color: transparent !important;
+    color: #ff0000 !important;
+    opacity: 0.8;  /* 약간의 시각적 피드백을 위해 투명도 조정 */
+  }
+
+
   form {
     display: flex;
+    flex-direction: column;
     gap: 1rem;
     margin-bottom: 2rem;
   }
+
   table {
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 2rem;
   }
+
   th, td {
-    border: 1px solid #ddd;
+    border: 1px solid #444;
     padding: 0.5rem;
     text-align: left;
   }
-  .edit-form {
-    margin-top: 1rem;
-    padding: 1rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+
+  .popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
   }
-  .edit-form label {
-    display: block;
+
+  .popup-content {
+    background-color: #222;
+    color: #e0e0e0;
+    padding: 2rem;
+    border-radius: 5px;
+    max-width: 500px;
+    width: 100%;
+  }
+
+  .popup-content h2 {
+    color: #bb86fc;
+    margin-bottom: 1rem;
+  }
+
+  .popup-content p {
     margin-bottom: 0.5rem;
   }
-  .edit-form input, .edit-form select {
-    width: 100%;
-    padding: 0.3rem;
+
+  .popup-content button {
+    background-color: #bb86fc;
+    color: #000;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
   }
+
+  .popup-content button:hover {
+    background-color: #9d61f9;
+  }
+
+  .popup-content input,
+  .popup-content textarea {
+    background-color: #333;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    padding: 0.5rem;
+    border-radius: 4px;
+    width: 100%;
+  }
+
+  .popup-content label {
+    display: block;
+    margin-bottom: 0.3rem;
+    color: #bb86fc;
+  }
+
 
   @media (max-width: 768px) {
     .calendar-container {
-      height: 400px;
+      height: 350px;  /* 모바일에서는 더 작게 조정 */
     }
     
-    form {
-      flex-direction: column;
-    }
-    
-    table, thead, tbody, th, td, tr {
-      display: block;
-    }
-    
-    thead tr {
-      position: absolute;
-      top: -9999px;
-      left: -9999px;
-    }
-    
-    tr {
-      margin-bottom: 1rem;
-      border: 1px solid #ddd;
-    }
-    
-    td {
-      border: none;
-      position: relative;
-      padding-left: 50%;
-    }
-    
-    td:before {
-      content: attr(data-label);
-      position: absolute;
-      left: 6px;
-      width: 45%;
-      padding-right: 10px;
-      white-space: nowrap;
-      font-weight: bold;
-    }
+    /* ... (나머지 모바일 스타일은 그대로 유지) */
   }
 </style>
