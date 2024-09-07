@@ -97,6 +97,16 @@
 {/if}
 
 <style>
+  :global(body::after) {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 150%;
+    background-color: rgba(18, 18, 18, 0.6); /* 알파값을 0.8에서 0.7로 줄임 */
+    z-index: -1;
+  }
   .app {
     display: flex;
     flex-direction: column;
@@ -107,7 +117,8 @@
     background-color: rgba(0, 0, 0, 0.7);
     color: #fff;
     text-align: center;
-    padding: 1rem;
+    padding: .2rem;
+    padding-bottom: 0;
   }
 
   .header-nav {
@@ -155,7 +166,7 @@
 
   .login-button, .logout-button {
     font-weight: 1000;
-    color: #ff0000;
+    color: var(--color-secondary)
     
     
 

@@ -45,7 +45,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      z-index: var(--z-index-menu);
+      z-index: 1005;
     }
     .popup-content {
       background-color: var(--color-surface);

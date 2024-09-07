@@ -15,6 +15,7 @@
   let showPopup = false;
   let userReservations = [];
   let selectedMenuItem = null;
+  let calendar;
 
   onMount(async () => {
     await loadAvailableDates();
@@ -41,37 +42,59 @@
   }
 
   function initializeCalendar() {
-    if (calendarEl) {
-      const calendar = new Calendar(calendarEl, {
-        plugins: [dayGridPlugin, interactionPlugin],
-        initialView: 'dayGridMonth',
-        dateClick: handleDateClick,
-        events: availableDates.map(date => ({
-          title: `${date.time} (${date.reserved_capacity || 0}/${date.capacity + date.reserved_capacity})`,
-          date: date.date
-        })),
-        headerToolbar: {
-          left: 'prev',
-          center: 'title',
-          right: 'next'
-        },
-        titleFormat: { month: 'numeric' },
-        dayHeaderFormat: { weekday: 'short' },
-        buttonText: {
-          prev: '<',
-          next: '>'
-        }
-      });
-      calendar.render();
-    }
+  if (calendarEl) {
+    calendar = new Calendar(calendarEl, {
+      plugins: [dayGridPlugin, interactionPlugin],
+      initialView: 'dayGridMonth',
+      dateClick: handleDateClick,
+      events: availableDates.map(date => ({
+        title: `${date.time}\n(${date.reserved_capacity || 0}/${date.capacity + date.reserved_capacity})`,
+        start: date.date,
+        allDay: true,
+        extendedProps: { availableDate: date }
+      })),
+      eventClick: handleEventClick,
+      headerToolbar: {
+        left: 'prev',
+        center: 'title',
+        right: 'next'
+      },
+      titleFormat: { month: 'numeric' },
+      buttonText: {
+        prev: '<',
+        next: '>'
+      },
+      dayCellContent: function(args) {
+        let cell = document.createElement('div');
+        cell.classList.add('custom-day-cell');
+        
+        let dayNumber = document.createElement('span');
+        dayNumber.classList.add('day-number');
+        dayNumber.innerText = args.dayNumberText;
+        cell.appendChild(dayNumber);
+        
+        return { domNodes: [cell] };
+      }
+    });
+    calendar.render();
   }
+}
 
   function handleDateClick(arg) {
+    console.log('Date click:', arg.dateStr);
     const clickedDate = availableDates.find(date => date.date === arg.dateStr);
     if (clickedDate) {
       selectedDate = clickedDate;
       showPopup = true;
+    } else {
+      alert("This date is not available for reservations.");
     }
+  }
+
+  function handleEventClick(arg) {
+    console.log('Event click:', arg.event.startStr);
+    selectedDate = arg.event.extendedProps.availableDate;
+    showPopup = true;
   }
 
   function closePopup() {
@@ -154,6 +177,38 @@
   $: availableCapacity = selectedDate ? selectedDate.capacity : 0;
 </script>
 
+<h2>Your Reservations</h2>
+{#if userReservations.length > 0}
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Guests</th>
+        <th>Menu</th>
+        <th>Drink</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {#each userReservations as reservation}
+        <tr>
+          <td>{reservation.date}</td>
+          <td>{reservation.time}</td>
+          <td>{reservation.guests}</td>
+          <td>{reservation.menu_name}</td>
+          <td>{reservation.drink_name}</td>
+          <td>
+            <button on:click={() => cancelReservation(reservation.id)}>Cancel</button>
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+{:else}
+  <p>You have no reservations.</p>
+{/if}
+
 <h1>Make a Reservation</h1>
 
 <div class="calendar-container" bind:this={calendarEl}></div>
@@ -168,7 +223,7 @@
       <p>Drink: {selectedDate.drink_name} (${selectedDate.drink_price})
         <button on:click={() => showMenuDetails(selectedDate.drink_id)}>View Drink Details</button>
       </p>
-      <p>Available: {selectedDate.reserved_capacity}/{selectedDate.capacity + selectedDate.reserved_capacity}</p>
+      <p>Available: {selectedDate.capacity - (selectedDate.reserved_capacity || 0)}/{selectedDate.capacity}</p>
 
       <form on:submit|preventDefault={makeReservation}>
         <label for="guests">Number of guests:</label>
@@ -187,49 +242,21 @@
   </div>
 {/if}
 
-<h2>Your Reservations</h2>
-{#if userReservations.length > 0}
-  <table>
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Time</th>
-        <th>Guests</th>
-        <th>Menu</th>
-        <th>Drink</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each userReservations as reservation}
-        <tr>
-          <td data-label="Date">{reservation.date}</td>
-          <td data-label="Time">{reservation.time}</td>
-          <td data-label="Guests">{reservation.guests}</td>
-          <td data-label="Menu">{reservation.menu_name}</td>
-          <td data-label="Drink">{reservation.drink_name}</td>
-          <td data-label="Actions">
-            <button on:click={() => cancelReservation(reservation.id)}>Cancel</button>
-          </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
-{:else}
-  <p>You have no reservations.</p>
-{/if}
+
 
 <MenuDetailPopup item={selectedMenuItem} onClose={closeMenuPopup} />
 
 <style>
   .calendar-container {
-    height: 400px;
+    height: 600px;
     margin-bottom: 2rem;
-    background-color: #000;
+    background-color: rgba(18, 18, 18, 0.8);
     width: 100%;
     max-width: 800px;
     margin-left: auto;
     margin-right: auto;
+    border-radius: 25px 25px 0px 0px;
+    
   }
 
   /* FullCalendar 스타일 오버라이드 */
@@ -243,12 +270,20 @@
     font-size: 2rem !important;
   }
 
+
+
   :global(.fc-col-header-cell-cushion) {
-    color: #fff;
+    color: var(--color-primary);
   }
 
   :global(.fc-daygrid-day-number) {
     color: #fff;
+    
+  }
+
+  :global(.fc-daygrid-day-events) {
+   margin-bottom: 2px;
+    
   }
 
   :global(.fc-day-today) {
@@ -258,6 +293,9 @@
   :global(.fc-event) {
     background-color: var(--color-secondary);
     border-color: var(--color-secondary);
+    white-space: pre-line;
+    text-align: center;
+    font-size: 0.7em;
   }
 
   :global(.fc-button-primary) {
@@ -276,9 +314,21 @@
     background-color: transparent !important;
     border-color: transparent !important;
     color: #ff0000 !important;
-    opacity: 0.8;  /* 약간의 시각적 피드백을 위해 투명도 조정 */
+    opacity: 0.8;
   }
 
+  :global(.custom-day-cell) {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    height: 100%;
+  }
+
+  :global(.day-number) {
+    font-size: 1em;
+    font-weight: bold;
+    padding: .2px;
+  }
 
   form {
     display: flex;
@@ -291,6 +341,7 @@
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 2rem;
+    background-color: #121212;
   }
 
   th, td {
@@ -309,7 +360,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    z-index: 1005;
   }
 
   .popup-content {
@@ -360,12 +411,22 @@
     color: #bb86fc;
   }
 
-
   @media (max-width: 768px) {
     .calendar-container {
-      height: 350px;  /* 모바일에서는 더 작게 조정 */
+      height: 400px;
     }
-    
-    /* ... (나머지 모바일 스타일은 그대로 유지) */
   }
+
+  :global(.available-date) {
+    background-color: var(--color-secondary);
+    border-color: var(--color-secondary);
+    color: #fff;
+    cursor: pointer;
+  }
+
+  :global(.fc-event-title) {
+  white-space: pre-wrap;
+  overflow: visible;
+  text-overflow: unset;
+}
 </style>

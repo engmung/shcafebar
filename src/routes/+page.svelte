@@ -15,17 +15,13 @@
   <p>Set up some refreshments. Join me for food and conversation?</p>
 
   <div class="button-container">
-    <button class="large-button reservation" on:click={() => navigateTo('/reservations')}>
-      <div class="icon-placeholder">
-        <img src="/time.png" alt="Time" class="icon-image" />
-      </div>
-      <span>Reservation</span>
+    <button class="large-button" on:click={() => navigateTo('/reservations')}>
+      <img src="/time.png" alt="Time" class="button-image" />
+      <span class="button-text">Reservation</span>
     </button>
-    <button class="large-button menu" on:click={() => navigateTo('/menu')}>
-      <div class="icon-placeholder">
-        <img src="/menu.png" alt="Menu" class="icon-image" />
-      </div>
-      <span>View Menu</span>
+    <button class="large-button" on:click={() => navigateTo('/menu')}>
+      <img src="/menu.png" alt="Menu" class="button-image" />
+      <span class="button-text">View Menu</span>
     </button>
   </div>
 </div>
@@ -33,17 +29,20 @@
 <style>
   .container {
     text-align: center;
-    padding: 2rem;
+    padding: 1rem;
+    padding-top: 0;
   }
 
   h1 {
-    font-size: 2.5rem;
+    font-size: 1.8rem;
     margin-bottom: 1rem;
+    color: var(--color-primary);
   }
 
   p {
-    font-size: 1.2rem;
-    margin-bottom: 2rem;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    color: var(--color-text);
   }
 
   .button-container {
@@ -51,56 +50,56 @@
     justify-content: center;
     gap: 2rem;
     flex-wrap: wrap;
+    
   }
 
   .large-button {
+    width: 250px;
+    height: 250px;
+    border: 2px solid var(--color-secondary);
+    border-radius: 15px;
+    background-color: rgba(18, 18, 18, 0.6);
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: center;
-    width: 200px;
-    height: 200px;
-    border: none;
-    border-radius: 10px;
-    background-color: var(--color-secondary);
-    color: white;
-    font-size: 1.2rem;
-    cursor: pointer;
-    transition: background-color 0.3s, transform 0.3s;
+    align-items: center;
+    padding: 1rem;
   }
 
   .large-button:hover {
-    background-color: var(--color-accent);
     transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(187, 134, 252, 0.3);
   }
 
-  .icon-placeholder {
-    width: 100px;
-    height: 100px;
-    background-color: rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
+  .button-image {
+    width: 120px;
+    height: 120px;
+    object-fit: contain;
     margin-bottom: 1rem;
   }
 
-  .icon-image {
-    width: 100%;
-    height: 100%;
-    object-fit: contain; /* Prevent image overflow */
+  .button-text {
+    color: var(--color-secondary);
+    font-size: 1.5rem;
+    font-weight: bold;
   }
 
-  @media (max-width: 600px) {
+  @media (max-width: 768px) {
     .large-button {
-      width: 100%;
-      max-width: 300px;
-      height: 150px;
+      width: 200px;
+      height: 200px;
     }
 
-    .icon-placeholder {
-      width: 70px;
-      height: 70px;
-      background-color: rgba(255, 255, 255, 0.2);
-      border-radius: 50%;
-      margin-bottom: 1rem;
+    .button-image {
+      width: 150px;
+      height: 150px;
+      margin-bottom: 0;
+    }
+
+    .button-text {
+      font-size: 1.2rem;
     }
   }
 </style>
