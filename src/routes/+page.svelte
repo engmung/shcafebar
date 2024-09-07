@@ -1,9 +1,32 @@
 <script>
   import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
 
   function navigateTo(path) {
     goto(path);
   }
+
+  let imagesLoaded = false;
+  
+  onMount(() => {
+    const images = document.querySelectorAll('.button-image');
+    let loadedCount = 0;
+    
+    function imageLoaded() {
+      loadedCount++;
+      if (loadedCount === images.length) {
+        imagesLoaded = true;
+      }
+    }
+    
+    images.forEach(img => {
+      if (img.complete) {
+        imageLoaded();
+      } else {
+        img.addEventListener('load', imageLoaded);
+      }
+    });
+  });
 </script>
 
 <svelte:head>
@@ -16,11 +39,11 @@
 
   <div class="button-container">
     <button class="large-button" on:click={() => navigateTo('/reservations')}>
-      <img src="/time.png" alt="Time" class="button-image" />
+      <img src="/time.png" alt="Time" class="button-image" loading="eager" />
       <span class="button-text">Reservation</span>
     </button>
     <button class="large-button" on:click={() => navigateTo('/menu')}>
-      <img src="/menu.png" alt="Menu" class="button-image" />
+      <img src="/menu.png" alt="Menu" class="button-image" loading="eager" />
       <span class="button-text">View Menu</span>
     </button>
   </div>
@@ -50,7 +73,6 @@
     justify-content: center;
     gap: 2rem;
     flex-wrap: wrap;
-    
   }
 
   .large-button {
@@ -93,9 +115,8 @@
     }
 
     .button-image {
-      width: 150px;
-      height: 150px;
-      margin-bottom: 0;
+      width: 80px;
+      height: 80px;
     }
 
     .button-text {

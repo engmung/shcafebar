@@ -298,4 +298,36 @@
     width: 100%;
     padding: 0.3rem;
   }
+  @media (max-width: 768px) {
+    form {
+      flex-direction: column;
+    }
+    
+    form input, form select {
+      width: 100%;
+      margin-bottom: 0.5rem;
+    }
+    
+    .calendar-container {
+      height: 400px;
+      background-color: black;
+    }
+    
+    table {
+      font-size: 0.9rem;
+    }
+    
+    th, td {
+      padding: 0.3rem;
+    }
+    
+    .edit-form {
+      padding: 0.5rem;
+    }
+    
+    .edit-form input, .edit-form select {
+      width: 100%;
+      margin-bottom: 0.5rem;
+    }
+  }
 </style>
