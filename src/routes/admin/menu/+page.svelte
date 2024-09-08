@@ -200,37 +200,39 @@
   <button type="submit">Add Item</button>
 </form>
 
-<table>
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Description</th>
-      <th>Price</th>
-      <th>Category</th>
-      <th>Visibility</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {#each menuItems as item (item.id)}
+<div class="table-container">
+  <table>
+    <thead>
       <tr>
-        <td>{item.name}</td>
-        <td>{item.description}</td>
-        <td>{item.price}</td>
-        <td>{item.category}</td>
-        <td>
-          <button on:click={() => toggleVisibility(item)}>
-            {item.is_visible ? 'Hide' : 'Show'}
-          </button>
-        </td>
-        <td>
-          <button on:click={() => showDetails(item)}>View Details</button>
-          <button on:click={() => deleteMenuItem(item.id)}>Delete</button>
-        </td>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Price</th>
+        <th>Category</th>
+        <th>Visibility</th>
+        <th>Actions</th>
       </tr>
-    {/each}
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      {#each menuItems as item (item.id)}
+        <tr>
+          <td data-label="Name">{item.name}</td>
+          <td data-label="Description">{item.description}</td>
+          <td data-label="Price">{item.price}</td>
+          <td data-label="Category">{item.category}</td>
+          <td data-label="Visibility">
+            <button on:click={() => toggleVisibility(item)}>
+              {item.is_visible ? 'Hide' : 'Show'}
+            </button>
+          </td>
+          <td data-label="Actions">
+            <button on:click={() => showDetails(item)}>View Details</button>
+            <button on:click={() => deleteMenuItem(item.id)}>Delete</button>
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+</div>
 
 {#if showPopup && $selectedItemStore}
   <div class="popup">
@@ -370,5 +372,51 @@
     color: #a0a0a0;
   }
 
-  
+  @media (max-width: 768px) {
+    .table-container {
+      overflow-x: initial;
+    }
+
+    table, thead, tbody, th, td, tr {
+      display: block;
+    }
+
+    thead tr {
+      position: absolute;
+      top: -9999px;
+      left: -9999px;
+    }
+
+    tr {
+      margin-bottom: 1rem;
+      border: 1px solid #ddd;
+    }
+
+    td {
+      border: none;
+      position: relative;
+      padding-left: 50%;
+      text-align: right;
+    }
+
+    td:before {
+      content: attr(data-label);
+      position: absolute;
+      left: 6px;
+      width: 45%;
+      padding-right: 10px;
+      white-space: nowrap;
+      text-align: left;
+      font-weight: bold;
+    }
+
+    td:last-child {
+      text-align: center;
+      padding-left: 6px;
+    }
+
+    td:last-child:before {
+      content: none;
+    }
+  }
 </style>

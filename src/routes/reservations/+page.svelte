@@ -179,32 +179,36 @@
 
 <h2>Your Reservations</h2>
 {#if userReservations.length > 0}
-  <table>
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Time</th>
-        <th>Guests</th>
-        <th>Menu</th>
-        <th>Drink</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each userReservations as reservation}
+  <div class="table-container">
+    <table>
+      <thead>
         <tr>
-          <td>{reservation.date}</td>
-          <td>{reservation.time}</td>
-          <td>{reservation.guests}</td>
-          <td>{reservation.menu_name}</td>
-          <td>{reservation.drink_name}</td>
-          <td>
-            <button on:click={() => cancelReservation(reservation.id)}>Cancel</button>
-          </td>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Guests</th>
+          <th>Menu</th>
+          <th>Drink</th>
+          <th></th>
         </tr>
-      {/each}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {#each userReservations as reservation}
+          <tr>
+            <td>{reservation.date}</td>
+            <td>{reservation.time}</td>
+            <td>{reservation.guests}</td>
+            <td>{reservation.menu_name}</td>
+            <td>{reservation.drink_name}</td>
+            <td>
+              <span class="cancel-btn" on:click={() => cancelReservation(reservation.id)} role="button" tabindex="0">
+                ×
+              </span>
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
 {:else}
   <p>You have no reservations.</p>
 {/if}
@@ -256,7 +260,6 @@
     margin-left: auto;
     margin-right: auto;
     border-radius: 25px 25px 0px 0px;
-    
   }
 
   /* FullCalendar 스타일 오버라이드 */
@@ -267,10 +270,8 @@
 
   :global(.fc-toolbar-title) {
     color: #bb86fc !important;
-    font-size: 2rem !important;
+    font-size: 1.5rem !important;
   }
-
-
 
   :global(.fc-col-header-cell-cushion) {
     color: var(--color-primary);
@@ -278,16 +279,14 @@
 
   :global(.fc-daygrid-day-number) {
     color: #fff;
-    
   }
 
   :global(.fc-daygrid-day-events) {
-   margin-bottom: 2px;
-    
+    margin-bottom: 2px;
   }
 
   :global(.fc-day-today) {
-    background-color: transparent !important;
+    background-color: rgba(187, 134, 252, 0.1) !important;
   }
 
   :global(.fc-event) {
@@ -302,7 +301,7 @@
     background-color: transparent !important;
     border-color: transparent !important;
     color: #ff0000 !important;
-    font-size: 1.5rem !important;
+    font-size: 1.2rem !important;
     padding: 0.3em 0.5em !important;
     box-shadow: none !important;
   }
@@ -311,7 +310,7 @@
   :global(.fc-button-primary:focus),
   :global(.fc-button-primary:not(:disabled):active),
   :global(.fc-button-primary:not(:disabled).fc-button-active) {
-    background-color: transparent !important;
+    background-color: rgba(255, 0, 0, 0.1) !important;
     border-color: transparent !important;
     color: #ff0000 !important;
     opacity: 0.8;
@@ -327,7 +326,7 @@
   :global(.day-number) {
     font-size: 1em;
     font-weight: bold;
-    padding: .2px;
+    padding: 2px;
   }
 
   form {
@@ -335,6 +334,10 @@
     flex-direction: column;
     gap: 1rem;
     margin-bottom: 2rem;
+  }
+
+  .table-container {
+    overflow-x: auto;
   }
 
   table {
@@ -369,7 +372,9 @@
     padding: 2rem;
     border-radius: 5px;
     max-width: 500px;
-    width: 100%;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
   }
 
   .popup-content h2 {
@@ -411,12 +416,6 @@
     color: #bb86fc;
   }
 
-  @media (max-width: 768px) {
-    .calendar-container {
-      height: 400px;
-    }
-  }
-
   :global(.available-date) {
     background-color: var(--color-secondary);
     border-color: var(--color-secondary);
@@ -425,8 +424,61 @@
   }
 
   :global(.fc-event-title) {
-  white-space: pre-wrap;
-  overflow: visible;
-  text-overflow: unset;
-}
+    white-space: pre-wrap;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .cancel-btn {
+    color: var(--color-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    font-weight: bold;
+    display: inline-block;
+    line-height: 1;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+
+  .cancel-btn:hover {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+
+  @media (max-width: 768px) {
+    .cancel-btn {
+      font-size: 1.2rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .calendar-container {
+      height: 400px;
+    }
+
+    :global(.fc-toolbar-title) {
+      font-size: 1.2rem !important;
+    }
+
+    :global(.fc-button-primary) {
+      font-size: 1rem !important;
+    }
+
+    .popup-content {
+      padding: 1rem;
+    }
+
+    table {
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 0.3rem;
+      font-size: 0.8rem;
+    }
+
+    .cancel-btn {
+      font-size: 1.2rem;
+    }
+  }
+  
 </style>

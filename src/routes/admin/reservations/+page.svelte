@@ -197,34 +197,36 @@
 </table>
 
 <h2>Reservations</h2>
-<table>
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Time</th>
-      <th>User</th>
-      <th>Guests</th>
-      <th>Menu</th>
-      <th>Drink</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {#each reservations as reservation}
+<div class="table-container">
+  <table>
+    <thead>
       <tr>
-        <td>{reservation.date}</td>
-        <td>{reservation.time}</td>
-        <td>{reservation.user_name}</td>
-        <td>{reservation.guests}</td>
-        <td>{reservation.menu_name}</td>
-        <td>{reservation.drink_name}</td>
-        <td>
-          <button on:click={() => deleteReservation(reservation.id)}>Delete</button>
-        </td>
+        <th>Date</th>
+        <th>Time</th>
+        <th>User</th>
+        <th>Guests</th>
+        <th>Menu</th>
+        <th>Drink</th>
+        <th>Actions</th>
       </tr>
-    {/each}
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      {#each reservations as reservation}
+        <tr>
+          <td data-label="Date">{reservation.date}</td>
+          <td data-label="Time">{reservation.time}</td>
+          <td data-label="User">{reservation.user_name}</td>
+          <td data-label="Guests">{reservation.guests}</td>
+          <td data-label="Menu">{reservation.menu_name}</td>
+          <td data-label="Drink">{reservation.drink_name}</td>
+          <td data-label="Actions">
+            <button on:click={() => deleteReservation(reservation.id)}>Delete</button>
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+</div>
 
 {#if editingDate}
   <div class="edit-form">
@@ -329,5 +331,52 @@
       width: 100%;
       margin-bottom: 0.5rem;
     }
+  
+    .table-container {
+      overflow-x: initial;
+    }
+
+    table, thead, tbody, th, td, tr {
+      display: block;
+    }
+
+    thead tr {
+      position: absolute;
+      top: -9999px;
+      left: -9999px;
+    }
+
+    tr {
+      margin-bottom: 1rem;
+      border: 1px solid #ddd;
+    }
+
+    td {
+      border: none;
+      position: relative;
+      padding-left: 50%;
+      text-align: right;
+    }
+
+    td:before {
+      content: attr(data-label);
+      position: absolute;
+      left: 6px;
+      width: 45%;
+      padding-right: 10px;
+      white-space: nowrap;
+      text-align: left;
+      font-weight: bold;
+    }
+
+    td:last-child {
+      text-align: center;
+      padding-left: 6px;
+    }
+
+    td:last-child:before {
+      content: none;
+    }
   }
+
 </style>
