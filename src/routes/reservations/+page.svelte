@@ -42,43 +42,43 @@
   }
 
   function initializeCalendar() {
-  if (calendarEl) {
-    calendar = new Calendar(calendarEl, {
-      plugins: [dayGridPlugin, interactionPlugin],
-      initialView: 'dayGridMonth',
-      dateClick: handleDateClick,
-      events: availableDates.map(date => ({
-        title: `${date.time}\n(${date.reserved_capacity || 0}/${date.capacity + date.reserved_capacity})`,
-        start: date.date,
-        allDay: true,
-        extendedProps: { availableDate: date }
-      })),
-      eventClick: handleEventClick,
-      headerToolbar: {
-        left: 'prev',
-        center: 'title',
-        right: 'next'
-      },
-      titleFormat: { month: 'numeric' },
-      buttonText: {
-        prev: '<',
-        next: '>'
-      },
-      dayCellContent: function(args) {
-        let cell = document.createElement('div');
-        cell.classList.add('custom-day-cell');
-        
-        let dayNumber = document.createElement('span');
-        dayNumber.classList.add('day-number');
-        dayNumber.innerText = args.dayNumberText;
-        cell.appendChild(dayNumber);
-        
-        return { domNodes: [cell] };
-      }
-    });
-    calendar.render();
+    if (calendarEl) {
+      calendar = new Calendar(calendarEl, {
+        plugins: [dayGridPlugin, interactionPlugin],
+        initialView: 'dayGridMonth',
+        dateClick: handleDateClick,
+        events: availableDates.map(date => ({
+          title: `${date.time}\n(${date.reserved_capacity || 0}/${date.capacity + date.reserved_capacity})`,
+          start: date.date,
+          allDay: true,
+          extendedProps: { availableDate: date }
+        })),
+        eventClick: handleEventClick,
+        headerToolbar: {
+          left: 'prev',
+          center: 'title',
+          right: 'next'
+        },
+        titleFormat: { month: 'numeric' },
+        buttonText: {
+          prev: '<',
+          next: '>'
+        },
+        dayCellContent: function(args) {
+          let cell = document.createElement('div');
+          cell.classList.add('custom-day-cell');
+          
+          let dayNumber = document.createElement('span');
+          dayNumber.classList.add('day-number');
+          dayNumber.innerText = args.dayNumberText;
+          cell.appendChild(dayNumber);
+          
+          return { domNodes: [cell] };
+        }
+      });
+      calendar.render();
+    }
   }
-}
 
   function handleDateClick(arg) {
     console.log('Date click:', arg.dateStr);
@@ -162,13 +162,26 @@
   }
 
   async function showMenuDetails(menuId) {
+  try {
     const response = await fetch(`/api/menu/${menuId}`);
     if (response.ok) {
       selectedMenuItem = await response.json();
+      
+      // 이미지 정보 가져오기
+      const imagesResponse = await fetch(`/api/menu/${menuId}/images`);
+      if (imagesResponse.ok) {
+        selectedMenuItem.images = await imagesResponse.json();
+      } else {
+        console.error(`Failed to fetch images for menu item ${menuId}`);
+        selectedMenuItem.images = [];
+      }
     } else {
       console.error('Failed to load menu item details');
     }
+  } catch (error) {
+    console.error('Error loading menu item details:', error);
   }
+}
 
   function closeMenuPopup() {
     selectedMenuItem = null;
@@ -246,9 +259,7 @@
   </div>
 {/if}
 
-
-
-<MenuDetailPopup item={selectedMenuItem} onClose={closeMenuPopup} />
+<MenuDetailPopup item={selectedMenuItem} on:close={closeMenuPopup} />
 
 <style>
   .calendar-container {

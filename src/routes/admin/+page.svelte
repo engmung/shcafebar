@@ -31,6 +31,24 @@
       console.error('Failed to load low stock ingredients');
     }
   }
+
+  async function cleanupImages() {
+    if (confirm('Are you sure you want to clean up unused images?')) {
+      try {
+        const response = await fetch('/api/admin/cleanup-images', { method: 'POST' });
+        if (response.ok) {
+          const result = await response.json();
+          alert(`Cleanup completed. Removed ${result.removedCount} unused images.`);
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Unknown error');
+        }
+      } catch (error) {
+        console.error('Error cleaning up images:', error);
+        alert('An error occurred while cleaning up images: ' + error.message);
+      }
+    }
+  }
 </script>
 
 <h1>Admin Dashboard</h1>
@@ -53,6 +71,9 @@
     <p>{stats.totalUsers}</p>
   </div>
 </div>
+
+<h2>Maintenance</h2>
+<button on:click={cleanupImages}>Clean Up Unused Images</button>
 
 <h2>Low Stock Ingredients</h2>
 {#if lowStockIngredients.length > 0}

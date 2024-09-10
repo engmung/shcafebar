@@ -1,6 +1,3 @@
-
-
-
 <script>
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
@@ -16,7 +13,8 @@
     category: '', 
     ingredients: [],
     detail_content: '',
-    is_visible: true  // 새로운 필드 추가
+    is_visible: true,
+    images: []
   });
   let selectedItemStore = writable(null);
   let showPopup = false;
@@ -31,6 +29,12 @@
     const response = await fetch('/api/admin/menu');
     if (response.ok) {
       menuItems = await response.json();
+      for (let item of menuItems) {
+        const imagesResponse = await fetch(`/api/admin/menu/${item.id}/images`);
+        if (imagesResponse.ok) {
+          item.images = await imagesResponse.json();
+        }
+      }
     } else {
       console.error('Failed to load menu items');
     }
@@ -46,80 +50,95 @@
   }
 
   async function addMenuItem() {
-    try {
-      console.log("Adding new item:", $newItemStore);
-      const response = await fetch('/api/admin/menu', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify($newItemStore)
+  try {
+    const menuItemData = {
+      name: $newItemStore.name,
+      description: $newItemStore.description,
+      price: parseFloat($newItemStore.price),
+      category: $newItemStore.category,
+      ingredients: $newItemStore.ingredients.map(ing => ({
+        ...ing,
+        amount: parseFloat(ing.amount)
+      })),
+      detail_content: $newItemStore.detail_content,
+      is_visible: $newItemStore.is_visible
+    };
+
+    console.log('Sending data:', JSON.stringify(menuItemData));
+
+    const response = await fetch('/api/admin/menu', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(menuItemData)
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      // 이미지 업로드 처리
+      for (let image of $newItemStore.images) {
+        await uploadImage(result.id, image);
+      }
+      await loadMenuItems();
+      newItemStore.set({ 
+        name: '', 
+        description: '', 
+        price: '', 
+        category: '', 
+        ingredients: [],
+        detail_content: '',
+        is_visible: true,
+        images: []
       });
-
-      if (response.ok) {
-        await loadMenuItems();
-        newItemStore.set({ 
-          name: '', 
-          description: '', 
-          price: '', 
-          category: '', 
-          ingredients: [],
-          detail_content: '',
-          is_visible: true
-        });
-      } else {
-        const errorData = await response.json();
-        alert('Failed to add menu item: ' + (errorData.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Error adding menu item:', error);
-      alert('An error occurred while adding the menu item');
+    } else {
+      const errorData = await response.json();
+      alert('Failed to add menu item: ' + (errorData.error || 'Unknown error'));
     }
+  } catch (error) {
+    console.error('Error adding menu item:', error);
+    alert('An error occurred while adding the menu item');
+  }
+}
+
+async function uploadImage(menuId, file) {
+  const formData = new FormData();
+  formData.append('menuId', menuId);
+  formData.append('image', file);
+  formData.append('isPrimary', file === $newItemStore.images[0]);
+
+  try {
+    const response = await fetch('/api/admin/menu/images', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Unknown error');
+    }
+
+    const result = await response.json();
+    console.log('Image uploaded successfully:', result);
+  } catch (error) {
+    console.error('Failed to upload image:', error);
+    alert('Failed to upload image: ' + error.message);
+  }
+}
+
+  async function handleImageUpload(event) {
+    const files = event.target.files;
+    newItemStore.update(item => ({
+      ...item,
+      images: [...item.images, ...files]
+    }));
   }
 
-  async function updateMenuItem(item) {
-    try {
-      console.log("Updating item:", item);
-      const response = await fetch(`/api/admin/menu/${item.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(item)
-      });
-
-      if (response.ok) {
-        await loadMenuItems();
-        closePopup();
-      } else {
-        const errorData = await response.json();
-        alert('Failed to update menu item: ' + (errorData.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Error updating menu item:', error);
-      alert('An error occurred while updating the menu item');
-    }
-  }
-
-  async function deleteMenuItem(id) {
-    if (confirm('Are you sure you want to delete this menu item?')) {
-      try {
-        const response = await fetch(`/api/admin/menu/${id}`, {
-          method: 'DELETE'
-        });
-
-        if (response.ok) {
-          await loadMenuItems();
-        } else {
-          const errorData = await response.json();
-          alert('Failed to delete menu item: ' + (errorData.error || 'Unknown error'));
-        }
-      } catch (error) {
-        console.error('Error deleting menu item:', error);
-        alert('An error occurred while deleting the menu item');
-      }
-    }
-  }
-
-  async function toggleVisibility(item) {
-    const updatedItem = { ...item, is_visible: !item.is_visible };
-    await updateMenuItem(updatedItem);
+  function removeImage(index) {
+    newItemStore.update(item => ({
+      ...item,
+      images: item.images.filter((_, i) => i !== index)
+    }));
   }
 
   function addIngredientToItem(itemStore) {
@@ -136,8 +155,74 @@
     }));
   }
 
+  async function updateMenuItem(item) {
+  try {
+    const formData = new FormData();
+    for (let [key, value] of Object.entries(item)) {
+      if (key !== 'images' && key !== 'ingredients') {
+        formData.append(key, typeof value === 'string' ? value : JSON.stringify(value));
+      }
+    }
+    formData.append('ingredients', JSON.stringify(item.ingredients));
+    
+    // 이미지 처리
+    if (item.images && item.images.length > 0) {
+      const existingImages = [];
+      const newImages = [];
+
+      item.images.forEach((image, index) => {
+        if (image instanceof File) {
+          formData.append(`new_image_${index}`, image);
+          newImages.push(index);
+        } else if (typeof image === 'string' || (image && image.image_url)) {
+          existingImages.push(typeof image === 'string' ? image : image.image_url);
+        }
+      });
+
+      formData.append('existing_images', JSON.stringify(existingImages));
+      formData.append('new_images', JSON.stringify(newImages));
+    }
+    
+    const response = await fetch(`/api/admin/menu/${item.id}`, {
+      method: 'PUT',
+      body: formData
+    });
+
+    if (response.ok) {
+      await loadMenuItems();
+      closePopup();
+    } else {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Unknown error');
+    }
+  } catch (error) {
+    console.error('Error updating menu item:', error);
+    alert('An error occurred while updating the menu item: ' + error.message);
+  }
+}
+
+async function deleteMenuItem(id) {
+  if (confirm('Are you sure you want to delete this menu item?')) {
+    try {
+      const response = await fetch(`/api/admin/menu/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        await loadMenuItems();
+      } else {
+        const errorData = await response.json();
+        alert('Failed to delete menu item: ' + (errorData.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error deleting menu item:', error);
+      alert('An error occurred while deleting the menu item');
+    }
+  }
+}
+
   function showDetails(item) {
-    selectedItemStore.set({...item, detail_content: item.detail_content || ''});
+    selectedItemStore.set({...item, images: [...item.images]});
     showPopup = true;
     editMode = false;
   }
@@ -150,10 +235,6 @@
 
   function toggleEditMode() {
     editMode = !editMode;
-  }
-
-  function updateDetailContent(event) {
-    $selectedItemStore.detail_content = event.detail.value;
   }
 
   function renderMarkdown(content) {
@@ -192,6 +273,15 @@
   <h3>Detail Content (Markdown)</h3>
   <MarkdownEditor bind:value={$newItemStore.detail_content} />
 
+  <h3>Images</h3>
+  <input type="file" on:change={handleImageUpload} multiple accept="image/*">
+  {#each $newItemStore.images as image, index (index)}
+    <div>
+      <img src={URL.createObjectURL(image)} alt="Menu item preview" style="max-width: 200px;">
+      <button type="button" on:click={() => removeImage(index)}>Remove</button>
+    </div>
+  {/each}
+
   <label>
     <input type="checkbox" bind:checked={$newItemStore.is_visible}>
     Visible to users
@@ -220,7 +310,7 @@
           <td data-label="Price">{item.price}</td>
           <td data-label="Category">{item.category}</td>
           <td data-label="Visibility">
-            <button on:click={() => toggleVisibility(item)}>
+            <button on:click={() => updateMenuItem({...item, is_visible: !item.is_visible})}>
               {item.is_visible ? 'Hide' : 'Show'}
             </button>
           </td>
@@ -265,10 +355,35 @@
 
         <h3>Detail Content (Markdown)</h3>
         <MarkdownEditor 
-          bind:value={$selectedItemStore.detail_content} 
-          on:input={updateDetailContent}
+          bind:value={$selectedItemStore.detail_content}
         />
         
+        <h3>Images</h3>
+        <input type="file" on:change={event => {
+          const files = event.target.files;
+          selectedItemStore.update(item => ({
+            ...item,
+            images: [...item.images, ...files]
+          }));
+        }} multiple accept="image/*">
+        {#each $selectedItemStore.images as image, index (index)}
+          <div>
+            {#if typeof image === 'string'}
+              <img src={image} alt="Menu item" style="max-width: 200px;">
+            {:else if image instanceof File}
+              <img src={URL.createObjectURL(image)} alt="Menu item preview" style="max-width: 200px;">
+            {:else}
+              <img src={image.image_url} alt="Menu item" style="max-width: 200px;">
+            {/if}
+            <button type="button" on:click={() => {
+              selectedItemStore.update(item => ({
+                ...item,
+                images: item.images.filter((_, i) => i !== index)
+              }));
+            }}>Remove</button>
+          </div>
+        {/each}
+
         <label>
           <input type="checkbox" bind:checked={$selectedItemStore.is_visible}>
           Visible to users
@@ -287,6 +402,10 @@
             <li>{ingredient.amount} {ingredient.unit} of {ingredient.name}</li>
           {/each}
         </ul>
+        <h3>Images</h3>
+        {#each $selectedItemStore.images as image}
+          <img src={image.image_url} alt="Menu item" style="max-width: 200px;">
+        {/each}
         <h3>Detail Content Preview</h3>
         <div class="markdown-preview">
           {@html renderMarkdown($selectedItemStore.detail_content)}
@@ -305,14 +424,15 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.8);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
   }
   .popup-content {
-    background-color: white;
+    background-color: var(--color-surface);
+    color: var(--color-text);
     padding: 2rem;
     border-radius: 5px;
     max-width: 80%;
@@ -321,84 +441,117 @@
     overflow-y: auto;
   }
   .markdown-preview {
-    border: 1px solid #333;
+    border: 1px solid var(--color-secondary);
     padding: 1rem;
     border-radius: 4px;
     max-height: 400px;
     overflow-y: auto;
-    background-color: #2c2c2c;
+    background-color: var(--color-bg);
   }
-
   .markdown-preview :global(h1),
   .markdown-preview :global(h2),
   .markdown-preview :global(h3),
   .markdown-preview :global(h4),
   .markdown-preview :global(h5),
   .markdown-preview :global(h6) {
-    color: #bb86fc;
+    color: var(--color-primary);
     margin-top: 1em;
     margin-bottom: 0.5em;
   }
-
   .markdown-preview :global(p) {
     margin-bottom: 1em;
   }
-
   .markdown-preview :global(ul),
   .markdown-preview :global(ol) {
     padding-left: 2em;
     margin-bottom: 1em;
   }
-
   .markdown-preview :global(code) {
-    background-color: #3c3c3c;
-    color: #e0e0e0;
+    background-color: #333;
+    color: var(--color-text);
     padding: 0.2em 0.4em;
     border-radius: 3px;
   }
-
   .markdown-preview :global(pre) {
-    background-color: #3c3c3c;
-    color: #e0e0e0;
+    background-color: #333;
+    color: var(--color-text);
     padding: 1em;
     border-radius: 3px;
     overflow-x: auto;
   }
-
   .markdown-preview :global(blockquote) {
-    border-left: 4px solid #bb86fc;
+    border-left: 4px solid var(--color-secondary);
     padding-left: 1em;
     margin-left: 0;
     color: #a0a0a0;
   }
-
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  input, select, textarea {
+    padding: 0.5rem;
+    border: 1px solid var(--color-secondary);
+    border-radius: 4px;
+    background-color: var(--color-surface);
+    color: var(--color-text);
+  }
+  button {
+    padding: 0.5rem 1rem;
+    background-color: var(--color-primary);
+    color: var(--color-bg);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  button:hover {
+    background-color: var(--color-secondary);
+  }
+  .table-container {
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+  }
+  th, td {
+    border: 1px solid var(--color-secondary);
+    padding: 0.5rem;
+    text-align: left;
+  }
+  th {
+    background-color: var(--color-surface);
+  }
   @media (max-width: 768px) {
-    .table-container {
-      overflow-x: initial;
+    .popup-content {
+      max-width: 95%;
+      padding: 1rem;
     }
-
+    .table-container {
+      overflow-x: auto;
+    }
     table, thead, tbody, th, td, tr {
       display: block;
     }
-
     thead tr {
       position: absolute;
       top: -9999px;
       left: -9999px;
     }
-
     tr {
       margin-bottom: 1rem;
-      border: 1px solid #ddd;
+      border: 1px solid var(--color-secondary);
     }
-
     td {
       border: none;
       position: relative;
       padding-left: 50%;
       text-align: right;
     }
-
     td:before {
       content: attr(data-label);
       position: absolute;
@@ -408,15 +561,6 @@
       white-space: nowrap;
       text-align: left;
       font-weight: bold;
-    }
-
-    td:last-child {
-      text-align: center;
-      padding-left: 6px;
-    }
-
-    td:last-child:before {
-      content: none;
     }
   }
 </style>

@@ -6,21 +6,25 @@
   let selectedItem = null;
 
   onMount(async () => {
-    const response = await fetch('/api/menu');
-    if (response.ok) {
-      menuItems = await response.json();
-    } else {
-      console.error('Failed to load menu items');
-    }
+    await loadMenuItems();
   });
 
-  async function showDetails(item) {
-    const response = await fetch(`/api/menu/${item.id}`);
-    if (response.ok) {
-      selectedItem = await response.json();
-    } else {
-      console.error('Failed to load menu item details');
+  async function loadMenuItems() {
+    try {
+      const response = await fetch('/api/menu');
+      if (response.ok) {
+        menuItems = await response.json();
+        console.log('Loaded menu items:', menuItems);
+      } else {
+        console.error('Failed to load menu items');
+      }
+    } catch (error) {
+      console.error('Error loading menu items:', error);
     }
+  }
+
+  function showDetails(item) {
+    selectedItem = item;
   }
 
   function closePopup() {
@@ -34,16 +38,20 @@
   <div class="menu-grid">
     {#each menuItems as item}
       <div class="menu-item">
-        {#if item.image_url}
-          <img src={item.image_url} alt={item.name} class="menu-image" />
+        {#if item.primary_image_url}
+          <img src={item.primary_image_url} alt={item.name} class="menu-image" />
+        {:else}
+          <div class="menu-image placeholder">No image available</div>
         {/if}
         <div class="menu-content">
-          <h3>{item.name}</h3>
-          <p>{item.description}</p>
+          <div class="title-category">
+            <h3 class="name">{item.name}</h3>
+            <span class="category">{item.category}</span>
+          </div>
+          <p class="description">{item.description}</p>
           <p class="price">${item.price.toFixed(2)}</p>
-          <p class="category">{item.category}</p>
-          <button on:click={() => showDetails(item)}>View Details</button>
         </div>
+        <button class="view-details" on:click={() => showDetails(item)}>View Details</button>
       </div>
     {/each}
   </div>
@@ -51,7 +59,7 @@
   <p>No menu items available.</p>
 {/if}
 
-<MenuDetailPopup item={selectedItem} onClose={closePopup} />
+<MenuDetailPopup item={selectedItem} on:close={closePopup} />
 
 <style>
   .menu-grid {
@@ -60,44 +68,76 @@
     gap: 1rem;
   }
   .menu-item {
-    background-color: rgba(0, 0, 0, 0.8);
-    border: 1px solid #333;
-    padding: 1rem;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-bg-overlay);
     border-radius: 5px;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
   }
-  .menu-image {
+  .menu-image, .menu-image.placeholder {
     width: 100%;
-    height: 200px;
+    height: 180px;
     object-fit: cover;
     border-radius: 5px 5px 0 0;
+    background-color: var(--color-bg-overlay);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--color-text);
+    font-style: italic;
   }
   .menu-content {
-    flex-grow: 1;
+    padding: 0.75rem;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    gap: 0.2rem;
+    position: relative;
+    padding-top: 0;
   }
-  .price {
-    font-weight: bold;
-    color: #bb86fc;
+  .title-category {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .name {
+    color: var(--color-primary);
+    font-size: 1.5em;
+    margin: 0;
   }
   .category {
     font-style: italic;
-    color: #03dac6;
+    font-size: 0.9em;
   }
-  button {
-    background-color: #bb86fc;
-    color: #000;
+  .description {
+    font-size: 0.9em;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    color: var(--color-primary);
+  }
+  .price {
+
+    position: absolute;
+    bottom: 0.75rem;
+    right: 0.75rem;
+    margin: 0;
+    font-size: 0.9em;
+  }
+  .view-details {
+    color: var(--color-text);
+    background-color: var(--color-primary);
     border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+    padding: 0.5rem;
     cursor: pointer;
     transition: background-color 0.3s;
+    width: 100%;
+    font-size: 0.9em;
   }
-  button:hover {
-    background-color: #3700b3;
-    color: #fff;
+  .view-details:hover {
+    background-color: var(--color-secondary);
   }
 </style>

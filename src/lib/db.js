@@ -1,3 +1,5 @@
+// File: src/lib/db.js
+
 import Database from "better-sqlite3";
 import { dev } from "$app/environment";
 import { DB_PATH } from "$env/static/private";
@@ -19,7 +21,12 @@ function getDatabase() {
     db = new Database(dbPath, { verbose: console.log });
     db.pragma("foreign_keys = ON");
 
-    if (!fs.existsSync(dbPath)) {
+    if (
+      !fs.existsSync(dbPath) ||
+      db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()
+        .length === 0
+    ) {
+      console.log("Initializing database...");
       createTables();
     }
   }
@@ -42,6 +49,15 @@ function createTables() {
       category TEXT NOT NULL,
       detail_content TEXT,
       is_visible BOOLEAN NOT NULL DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS menu_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      menu_id INTEGER NOT NULL,
+      image_url TEXT NOT NULL,
+      is_primary BOOLEAN NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (menu_id) REFERENCES menu_items (id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS orders (
@@ -95,6 +111,8 @@ function createTables() {
       FOREIGN KEY (menu_id) REFERENCES menu_items(id) ON DELETE CASCADE,
       FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE
     );
+
+    CREATE INDEX IF NOT EXISTS idx_menu_images_menu_id ON menu_images (menu_id);
   `);
 }
 
