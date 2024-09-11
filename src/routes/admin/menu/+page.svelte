@@ -102,9 +102,12 @@
 }
 
 async function uploadImage(menuId, file) {
+  // 이미지 압축
+  const compressedFile = await compressImage(file);
+  
   const formData = new FormData();
   formData.append('menuId', menuId);
-  formData.append('image', file);
+  formData.append('image', compressedFile, file.name);
   formData.append('isPrimary', file === $newItemStore.images[0]);
 
   try {
@@ -120,10 +123,51 @@ async function uploadImage(menuId, file) {
 
     const result = await response.json();
     console.log('Image uploaded successfully:', result);
+    return result;
   } catch (error) {
     console.error('Failed to upload image:', error);
     alert('Failed to upload image: ' + error.message);
+    throw error;
   }
+}
+
+async function compressImage(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const maxWidth = 1024;
+        const maxHeight = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width *= maxHeight / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+        }, 'image/jpeg', 0.7);
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
   async function handleImageUpload(event) {

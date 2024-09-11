@@ -25,6 +25,7 @@
     "@fullcalendar/web-component": "^6.1.15",
     "better-sqlite3": "^11.2.1",
     "marked": "^14.1.0",
+    "mime": "^4.0.4",
     "recharts": "^2.12.7",
     "svelte-calendar": "^3.1.6"
   }

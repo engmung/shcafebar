@@ -217,10 +217,28 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\app.html
 File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\hooks.server.js
 
 import { dev } from "$app/environment";
+import { resolveStaticFile } from "$lib/server/static";
+import path from "path";
 
 /** @type {import('@sveltejs/kit').Handle} */
 export async function handle({ event, resolve }) {
+  // 정적 파일 서빙
+  if (event.url.pathname.startsWith("/uploads/")) {
+    const filePath = path.join(process.cwd(), "static", event.url.pathname);
+    return resolveStaticFile(filePath, event);
+  }
+
   // CORS 설정
+  if (event.request.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+    });
+  }
+
   if (event.request.method !== "OPTIONS") {
     event.request.headers.set("Access-Control-Allow-Origin", "*");
   }
@@ -235,7 +253,9 @@ export async function handle({ event, resolve }) {
     }
   }
 
-  const response = await resolve(event);
+  const response = await resolve(event, {
+    filterSerializedResponseHeaders: (name) => name === "content-type",
+  });
 
   // CORS 헤더 설정
   response.headers.set("Access-Control-Allow-Origin", "*");
@@ -259,6 +279,9 @@ export async function handle({ event, resolve }) {
 
   return response;
 }
+
+
+Directory: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\lib\server
 
 
 File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\lib\db.js
@@ -604,10 +627,10 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\lib\MenuDetailPo
         </div>
       {/if}
 
-      <p>Price: ${item.price}</p>
-      <p>Category: {item.category}</p>
       <p>Description: {item.description}</p>
+      <p>Category: {item.category}</p>
       
+      <p>Price: ${item.price}</p>
       <h3>Ingredients</h3>
       <ul>
         {#each item.ingredients || [] as ingredient}
@@ -681,6 +704,7 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\lib\MenuDetailPo
     max-height: 400px;
     overflow-y: auto;
     background-color: var(--color-bg);
+    margin-bottom: 1rem;
   }
     .markdown-preview :global(h1),
     .markdown-preview :global(h2),
@@ -744,6 +768,34 @@ export function isTableAvailable(date, time) {
     )
     .get(date, time);
   return existingReservations.count < 5;
+}
+
+
+File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\lib\server\static.js
+
+import fs from "fs/promises";
+import mime from "mime";
+
+export async function resolveStaticFile(filePath, event) {
+  try {
+    const stats = await fs.stat(filePath);
+    if (stats.isFile()) {
+      const content = await fs.readFile(filePath);
+      const contentType = mime.getType(filePath) || "application/octet-stream";
+
+      return new Response(content, {
+        status: 200,
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "public, max-age=31536000, immutable",
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Error serving static file:", error);
+  }
+
+  return new Response("Not found", { status: 404 });
 }
 
 
@@ -2092,9 +2144,12 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\admin\men
 }
 
 async function uploadImage(menuId, file) {
+  // 이미지 압축
+  const compressedFile = await compressImage(file);
+  
   const formData = new FormData();
   formData.append('menuId', menuId);
-  formData.append('image', file);
+  formData.append('image', compressedFile, file.name);
   formData.append('isPrimary', file === $newItemStore.images[0]);
 
   try {
@@ -2110,10 +2165,51 @@ async function uploadImage(menuId, file) {
 
     const result = await response.json();
     console.log('Image uploaded successfully:', result);
+    return result;
   } catch (error) {
     console.error('Failed to upload image:', error);
     alert('Failed to upload image: ' + error.message);
+    throw error;
   }
+}
+
+async function compressImage(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const maxWidth = 1024;
+        const maxHeight = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width *= maxHeight / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+        }, 'image/jpeg', 0.7);
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
   async function handleImageUpload(event) {
@@ -3658,39 +3754,52 @@ export async function PUT({ params, request, locals }) {
 
 File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\api\admin\menu\images\+server.js
 
-// File: src/routes/api/admin/menu/images/+server.js
-
-import { db } from "$lib/db";
-import { json } from "@sveltejs/kit";
-import { writeFile } from "fs/promises";
-import { randomUUID } from "crypto";
+import { createWriteStream } from "fs";
+import { pipeline } from "stream/promises";
 import path from "path";
+import { db } from "$lib/db";
 
 export async function POST({ request, locals }) {
   if (!locals.user || locals.user.role !== "admin") {
-    return json({ error: "Unauthorized" }, { status: 401 });
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 403,
+    });
   }
-
-  const formData = await request.formData();
-  const menuId = formData.get("menuId");
-  const file = formData.get("image");
-  const isPrimary = formData.get("isPrimary") === "true";
-
-  if (!file) {
-    return json({ error: "No file uploaded" }, { status: 400 });
-  }
-
-  const fileExtension = path.extname(file.name);
-  const fileName = `${randomUUID()}${fileExtension}`;
-  const filePath = path.join(process.cwd(), "static", "uploads", fileName);
 
   try {
-    await writeFile(filePath, Buffer.from(await file.arrayBuffer()));
+    const formData = await request.formData();
+    const menuId = formData.get("menuId");
+    const file = formData.get("image");
+    const isPrimary = formData.get("isPrimary") === "true";
+
+    if (!file) {
+      return new Response(JSON.stringify({ error: "No file uploaded" }), {
+        status: 400,
+      });
+    }
+
+    const menuItem = db
+      .prepare("SELECT name FROM menu_items WHERE id = ?")
+      .get(menuId);
+    if (!menuItem) {
+      return new Response(JSON.stringify({ error: "Menu item not found" }), {
+        status: 404,
+      });
+    }
+
+    const fileExtension = path.extname(file.name);
+    const sanitizedMenuName = menuItem.name
+      .replace(/[^a-z0-9]/gi, "_")
+      .toLowerCase();
+    const fileName = `${sanitizedMenuName}_${Date.now()}${fileExtension}`;
+    const filePath = path.join(process.cwd(), "static", "uploads", fileName);
+
+    const writeStream = createWriteStream(filePath);
+    await pipeline(file.stream(), writeStream);
 
     const imageUrl = `/uploads/${fileName}`;
 
     if (isPrimary) {
-      // Set all other images for this menu item as non-primary
       db.prepare("UPDATE menu_images SET is_primary = 0 WHERE menu_id = ?").run(
         menuId
       );
@@ -3702,10 +3811,18 @@ export async function POST({ request, locals }) {
       )
       .run(menuId, imageUrl, isPrimary ? 1 : 0);
 
-    return json({ success: true, id: result.lastInsertRowid, imageUrl });
+    return new Response(
+      JSON.stringify({ success: true, id: result.lastInsertRowid, imageUrl }),
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   } catch (error) {
     console.error("Error uploading image:", error);
-    return json({ error: "Failed to upload image" }, { status: 500 });
+    return new Response(
+      JSON.stringify({ error: error.message || "Failed to upload image" }),
+      { status: 500 }
+    );
   }
 }
 
@@ -3895,8 +4012,6 @@ export async function DELETE({ params, locals }) {
 
 File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\api\admin\menu\[id]\images\+server.js
 
-// File: src/routes/api/menu/[id]/images/+server.js
-
 import { db } from "$lib/db";
 import { json } from "@sveltejs/kit";
 
@@ -3905,11 +4020,14 @@ export function GET({ params }) {
 
   try {
     const images = db
-      .prepare("SELECT * FROM menu_images WHERE menu_id = ?")
+      .prepare(
+        "SELECT * FROM menu_images WHERE menu_id = ? ORDER BY is_primary DESC"
+      )
       .all(id);
+    console.log(`Images for menu item ${id}:`, images); // 로깅 추가
     return json(images);
   } catch (error) {
-    console.error("Error fetching menu images:", error);
+    console.error(`Error fetching images for menu item ${id}:`, error);
     return json({ error: "Failed to fetch menu images" }, { status: 500 });
   }
 }
@@ -4231,12 +4349,38 @@ import { db } from "$lib/db";
 import { json } from "@sveltejs/kit";
 
 export function GET() {
-  const menuItems = db
-    .prepare(
-      "SELECT * FROM menu_items WHERE is_visible = 1 ORDER BY category, name"
-    )
-    .all();
-  return json(menuItems);
+  try {
+    const menuItems = db
+      .prepare(
+        `
+      SELECT 
+        mi.*,
+        (SELECT image_url FROM menu_images WHERE menu_id = mi.id ORDER BY is_primary DESC LIMIT 1) as primary_image_url
+      FROM menu_items mi
+      WHERE mi.is_visible = 1
+      ORDER BY mi.category, mi.name
+    `
+      )
+      .all();
+
+    // 각 메뉴 아이템에 대한 모든 이미지 정보를 가져옵니다
+    for (const item of menuItems) {
+      item.images = db
+        .prepare(
+          `
+        SELECT * FROM menu_images
+        WHERE menu_id = ?
+        ORDER BY is_primary DESC
+      `
+        )
+        .all(item.id);
+    }
+
+    return json(menuItems);
+  } catch (error) {
+    console.error("Error fetching menu items:", error);
+    return json({ error: "Failed to fetch menu items" }, { status: 500 });
+  }
 }
 
 
@@ -4522,22 +4666,6 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\menu\+pag
       if (response.ok) {
         menuItems = await response.json();
         console.log('Loaded menu items:', menuItems);
-        for (let item of menuItems) {
-          try {
-            const imagesResponse = await fetch(`/api/menu/${item.id}/images`);
-            if (imagesResponse.ok) {
-              item.images = await imagesResponse.json();
-              console.log(`Images for item ${item.id}:`, item.images);
-            } else {
-              console.error(`Failed to fetch images for menu item ${item.id}`);
-              item.images = [];
-            }
-          } catch (error) {
-            console.error(`Error fetching images for menu item ${item.id}:`, error);
-            item.images = [];
-          }
-        }
-        console.log('Final menu items with images:', menuItems);
       } else {
         console.error('Failed to load menu items');
       }
@@ -4546,7 +4674,7 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\menu\+pag
     }
   }
 
-  async function showDetails(item) {
+  function showDetails(item) {
     selectedItem = item;
   }
 
@@ -4561,18 +4689,20 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\menu\+pag
   <div class="menu-grid">
     {#each menuItems as item}
       <div class="menu-item">
-        {#if item.images && item.images.length > 0}
-          <img src={item.images[0].image_url} alt={item.name} class="menu-image" />
+        {#if item.primary_image_url}
+          <img src={item.primary_image_url} alt={item.name} class="menu-image" />
         {:else}
           <div class="menu-image placeholder">No image available</div>
         {/if}
         <div class="menu-content">
-          <h3>{item.name}</h3>
-          <p>{item.description}</p>
+          <div class="title-category">
+            <h3 class="name">{item.name}</h3>
+            <span class="category">{item.category}</span>
+          </div>
+          <p class="description">{item.description}</p>
           <p class="price">${item.price.toFixed(2)}</p>
-          <p class="category">{item.category}</p>
-          <button on:click={() => showDetails(item)}>View Details</button>
         </div>
+        <button class="view-details" on:click={() => showDetails(item)}>View Details</button>
       </div>
     {/each}
   </div>
@@ -4590,15 +4720,15 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\menu\+pag
   }
   .menu-item {
     background-color: var(--color-surface);
-    border: 1px solid var(--color-primary);
-    padding: 1rem;
+    border: 1px solid var(--color-bg-overlay);
     border-radius: 5px;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
   }
   .menu-image, .menu-image.placeholder {
     width: 100%;
-    height: 200px;
+    height: 180px;
     object-fit: cover;
     border-radius: 5px 5px 0 0;
     background-color: var(--color-bg-overlay);
@@ -4609,39 +4739,57 @@ File: C:\Users\사용자\Desktop\2024\24-2\bar-cafe-project\src\routes\menu\+pag
     font-style: italic;
   }
   .menu-content {
-    flex-grow: 1;
+    padding: 0.75rem;
     display: flex;
     flex-direction: column;
+    gap: 0.2rem;
+    position: relative;
+    padding-top: 0;
+  }
+  .title-category {
+    display: flex;
     justify-content: space-between;
+    align-items: baseline;
   }
-  .menu-content h3 {
+  .name {
     color: var(--color-primary);
-    margin-bottom: 0.5rem;
-  }
-  .menu-content p {
-    color: var(--color-text);
-    margin-bottom: 0.5rem;
-  }
-  .price {
-    font-weight: bold;
-    color: var(--color-secondary);
+    font-size: 1.5em;
+    margin: 0;
   }
   .category {
     font-style: italic;
-    color: var(--color-accent);
+    font-size: 0.9em;
   }
-  button {
+  .description {
+    font-size: 0.9em;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    color: var(--color-primary);
+  }
+  .price {
+
+    position: absolute;
+    bottom: 0.75rem;
+    right: 0.75rem;
+    margin: 0;
+    font-size: 0.9em;
+  }
+  .view-details {
+    color: var(--color-text);
     background-color: var(--color-primary);
-    color: var(--color-bg-overlay);
     border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+    padding: 0.5rem;
     cursor: pointer;
     transition: background-color 0.3s;
+    width: 100%;
+    font-size: 0.9em;
   }
-  button:hover {
+  .view-details:hover {
     background-color: var(--color-secondary);
-    color: var(--color-bg-overlay);
   }
 </style>
 

@@ -5,8 +5,10 @@ export default defineConfig({
   plugins: [sveltekit()],
   server: {
     fs: {
-      allow: ["."],
+      allow: [".."],
     },
+    port: 3001,
+    host: true,
   },
   optimizeDeps: {
     exclude: ["fs"],
@@ -16,8 +18,5 @@ export default defineConfig({
       external: ["fs"],
     },
   },
-  server: {
-    port: 3001,
-    host: true, // 이 줄을 추가합니다.
-  },
+  assetsInclude: ["**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif", "**/*.svg"],
 });
